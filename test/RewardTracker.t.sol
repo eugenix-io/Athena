@@ -27,9 +27,13 @@ contract RewardTrackerTest is Test {
     RewardDistributor rewardDistributor;
     RewardTracker rewardTracker;
     MockERC20 rewardToken;
+    address accountA;
+    address accountB;
     address gov = address(this);
 
     function setUp() public{
+        accountA = address(1001);
+        accountB = address(1002);
         rewardToken = new MockERC20();
         rewardTracker = new RewardTracker('LogX Token', 'LOGX');
         rewardDistributor = new RewardDistributor(address(rewardToken), address(rewardTracker));
@@ -96,7 +100,21 @@ contract RewardTrackerTest is Test {
         assertEq(rewardTokenAddress, expectedRewardTokenAddress, "Reward token address does not match expected value");
     }
 
+    function testApproveAndAllowance() public {
+        vm.prank(accountB);
+        rewardTracker.approve(accountA, 1000);
+
+        assertEq(rewardTracker.allowance(accountB, accountA), 1000);
+    }
+
+    function testTokensPerInternal() public {
+        rewardDistributor.updateLastDistributionTime();
+        rewardDistributor.setTokensPerInterval(100);
+        assertEq(rewardTracker.tokensPerInterval(), 100);
+    }
+
     //ToDo - need to write tests for the following functions -
-    //  balanceOf(), allowance(), tokensPerInterval(), updateRewards(), stake(), stakeForAccount(), unstake(),
-    //  unstakeForAccount(), approve(), transfer(), transferFrom(), claim(), claimForAccount(), claimable(), 
+    //  updateRewards(), stake(), stakeForAccount(), unstake(),
+    //  unstakeForAccount(), transfer(), transferFrom(), claim(), claimForAccount(), claimable(), 
+    //  Notes - balanceOf() to be tested along with stake()
 }
