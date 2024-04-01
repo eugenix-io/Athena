@@ -4,29 +4,18 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "../src/RewardDistributor.sol";
 import "../src/RewardTracker.sol";
+import "../libraries/open-zeppelin/ERC20.sol";
 
-contract MockERC20 {
-    string public name = "Mock ERC20 Token";
-    string public symbol = "MCK";
-    uint256 public totalSupply = 1e24;
-    mapping(address => uint256) public balanceOf;
-
-    constructor() {
-        balanceOf[msg.sender] = totalSupply;
-    }
-
-    function transfer(address to, uint256 amount) external returns (bool) {
-        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
-        balanceOf[msg.sender] -= amount;
-        balanceOf[to] += amount;
-        return true;
+contract RewardToken is ERC20 {
+    constructor(uint256 initialSupply) ERC20("Mock ERC20 Token", "MCK") {
+        _mint(msg.sender, initialSupply);
     }
 }
 
 contract RewardTrackerTest is Test {
     RewardDistributor rewardDistributor;
     RewardTracker rewardTracker;
-    MockERC20 rewardToken;
+    RewardToken rewardToken;
     address accountA;
     address accountB;
     address gov = address(this);
@@ -34,7 +23,7 @@ contract RewardTrackerTest is Test {
     function setUp() public{
         accountA = address(1001);
         accountB = address(1002);
-        rewardToken = new MockERC20();
+        rewardToken = new RewardToken(1e24);
         rewardTracker = new RewardTracker('LogX Token', 'LOGX');
         rewardDistributor = new RewardDistributor(address(rewardToken), address(rewardTracker));
         address[] memory depositTokens = new address[](1);
@@ -43,7 +32,7 @@ contract RewardTrackerTest is Test {
     }
 
     function testSetDepositToken() public {
-        address depositToken = address(new MockERC20());
+        address depositToken = address(new RewardToken(1e24));
         
         vm.prank(gov);
         rewardTracker.setDepositToken(depositToken, true);
@@ -51,7 +40,7 @@ contract RewardTrackerTest is Test {
     }
 
     function testFailSetDepositTokenByNonGov() public {
-        address depositToken = address(new MockERC20());
+        address depositToken = address(new RewardToken(1e24));
         address nonGov = address(0xBEEF);
         
         vm.prank(nonGov);
@@ -112,6 +101,7 @@ contract RewardTrackerTest is Test {
         rewardDistributor.setTokensPerInterval(100);
         assertEq(rewardTracker.tokensPerInterval(), 100);
     }
+
 
     //ToDo - need to write tests for the following functions -
     //  updateRewards(), stake(), stakeForAccount(), unstake(),
