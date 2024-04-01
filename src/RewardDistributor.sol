@@ -74,5 +74,21 @@ contract RewardDistributor is ReentrancyGuard, Governable {
 
         uint256 timeDiff = block.timestamp.sub(lastDistributionTime);
         return tokensPerInterval.mul(timeDiff);
-    }    
+    }  
+
+    function distribute() external returns(uint256) {
+        require(msg.sender == rewardTracker, "RewardDistributor: invalid msg.sender");
+        uint256 amount = pendingRewards();
+
+        if(amount == 0) { return 0; }
+
+        lastDistributionTime = block.timestamp;
+        uint256 balance = IERC20(rewardToken).balanceOf(address(this));
+        if(amount > balance) { amount = balance; }
+
+        IERC20(rewardToken).safeTransfer(msg.sender, amount);
+
+        emit Distribute(amount);
+        return amount;
+    }  
 }

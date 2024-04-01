@@ -2,23 +2,40 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
-import "../src/RewardDistributor.sol"; // Update the path according to your project structure
+import "../src/RewardDistributor.sol";
+import "../src/RewardTracker.sol";
 
-/**
-    @ToDo - need to deploy dummy rewardTracker contract for the following tests to pass
-            testPendingRewardsAfterBlocksHavePassed()
-            testPendingRewardsWhenNoTimeHasPassed()
-            testSetTokensPerInterval()
- */
-import "forge-std/console.sol";
+contract MockERC20 {
+    string public name = "Mock ERC20 Token";
+    string public symbol = "MCK";
+    uint256 public totalSupply = 1e24;
+    mapping(address => uint256) public balanceOf;
+
+    constructor() {
+        balanceOf[msg.sender] = totalSupply;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+}
 
 contract RewardDistributorTest is Test {
     RewardDistributor rewardDistributor;
-    address rewardToken = address(1); // Dummy address for the reward token
-    address rewardTracker = address(2); // Dummy address for the reward tracker
+    RewardTracker rewardTracker;
+    MockERC20 rewardToken;
 
     function setUp() public {
-        rewardDistributor = new RewardDistributor(rewardToken, rewardTracker);
+        rewardToken = new MockERC20();
+        rewardTracker = new RewardTracker('LogX Token', 'LOGX');
+        rewardDistributor = new RewardDistributor(address(rewardToken), address(rewardTracker));
+        address[] memory depositTokens = new address[](1);
+        depositTokens[0] = address(2);
+        rewardTracker.initialize(depositTokens, address(rewardDistributor));
+        rewardToken.transfer(address(rewardDistributor), 500 ether); // Simulate funding the contract
     }
 
     function testInitialAdminIsCorrect() view public {
@@ -62,5 +79,18 @@ contract RewardDistributorTest is Test {
         // Expected pending rewards should be 0 since no time has passed
         uint256 expectedPendingRewards = 0;
         assertEq(rewardDistributor.pendingRewards(), expectedPendingRewards, "Pending rewards should be 0 when no time has passed since the last distribution");
+    }
+
+    function testDistribute() public {
+        rewardDistributor.updateLastDistributionTime();
+        rewardDistributor.setTokensPerInterval(10 ether);
+        // Simulate time passing
+        vm.warp(block.timestamp + 1 hours);
+
+        // Only rewardTracker can call distribute
+        vm.prank(address(rewardTracker));
+        uint256 amountDistributed = rewardDistributor.distribute();
+
+        assertEq(amountDistributed, 500 ether, "Distributed amount does not match expected value");
     }
 }
