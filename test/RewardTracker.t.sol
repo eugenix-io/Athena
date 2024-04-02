@@ -38,6 +38,7 @@ contract RewardTrackerTest is Test {
         depositTokens[0] = address(depositToken);
         rewardTracker.initialize(depositTokens, address(rewardDistributor));
         depositToken.transfer(accountB, 100);
+        depositToken.transfer(accountA, 100);
     }
 
     function testSetDepositToken() public {
@@ -73,7 +74,7 @@ contract RewardTrackerTest is Test {
 
     function testSetHandler() public {
         vm.prank(gov);
-        address handlerMock = address(150); // Use a more realistic address in actual tests
+        address handlerMock = address(150);
         rewardTracker.setHandler(handlerMock, true);
         assertTrue(rewardTracker.isHandler(handlerMock), "Handler should be set");
     }
@@ -108,7 +109,26 @@ contract RewardTrackerTest is Test {
         assertEq(rewardTracker.tokensPerInterval(), 100);
     }
 
-    function testStakeAndUnstake() public {
+    function testUpdateRewards() public {
+        uint256 cumulativeRewardsBeforeUpdate = rewardTracker.cumulativeRewardPerToken();
+        //Set Cumulative rewards per token to test update rewards when address is null
+        rewardToken.transfer(address(rewardDistributor), 10000000);
+        rewardDistributor.updateLastDistributionTime();
+        rewardDistributor.setTokensPerInterval(100);
+
+        //Stake some tokens to create total supply
+        vm.prank(accountA);
+        depositToken.approve(address(rewardTracker), 100);
+        vm.prank(accountA);
+        rewardTracker.stake(address(depositToken), 100);
+
+        vm.warp(block.timestamp + 1 hours);
+        rewardTracker.updateRewards();
+        uint256 cumulativeRewardsAfterUpdate = rewardTracker.cumulativeRewardPerToken();
+        assertEq(cumulativeRewardsAfterUpdate > cumulativeRewardsBeforeUpdate, true);
+    }
+
+    function testStakeUnstakeAndBalanceOf() public {
         uint256 totalSupplyBeforeStake = rewardTracker.totalSupply();
         uint256 accountBalanceBeforeStake = rewardTracker.balances(address(accountB));
 
@@ -125,6 +145,9 @@ contract RewardTrackerTest is Test {
         assertEq(totalSupplyAfterStake - totalSupplyBeforeStake, 100);
         assertEq(accountBalanceAfterStake - accountBalanceBeforeStake, 100);
 
+        uint256 accountBalance = rewardTracker.balanceOf(accountB);
+        assertEq(accountBalance, 100);
+
         vm.prank(accountB);
         rewardTracker.unstake(address(depositToken), 100);
         
@@ -134,8 +157,40 @@ contract RewardTrackerTest is Test {
         assertEq(accountBalanceBeforeStake, accountBalanceAfterUnStake);
     }
 
+    function testStakeAndUnstakeForAccount() public {
+        vm.prank(gov);
+        address handlerMock = address(150);
+        rewardTracker.setHandler(handlerMock, true);
+
+        uint256 totalSupplyBeforeStake = rewardTracker.totalSupply();
+        uint256 accountBalanceBeforeStake = rewardTracker.balances(address(accountB));
+
+        rewardDistributor.updateLastDistributionTime();
+        rewardDistributor.setTokensPerInterval(100);
+        vm.prank(accountB);
+        depositToken.approve(address(rewardTracker), 100);
+        vm.prank(address(150));
+        rewardTracker.stakeForAccount(accountB, accountB, address(depositToken), 100);
+        
+        uint256 totalSupplyAfterStake = rewardTracker.totalSupply();
+        uint256 accountBalanceAfterStake = rewardTracker.balances(address(accountB));
+
+        assertEq(totalSupplyAfterStake - totalSupplyBeforeStake, 100);
+        assertEq(accountBalanceAfterStake - accountBalanceBeforeStake, 100);
+
+        uint256 accountBalance = rewardTracker.balanceOf(accountB);
+        assertEq(accountBalance, 100);
+
+        vm.prank(address(150));
+        rewardTracker.unstakeForAccount(accountB, address(depositToken), 100, accountB);
+        
+        uint256 totalSupplyAfterUnStake = rewardTracker.totalSupply();
+        uint256 accountBalanceAfterUnStake = rewardTracker.balances(address(accountB));
+        assertEq(totalSupplyBeforeStake, totalSupplyAfterUnStake);
+        assertEq(accountBalanceBeforeStake, accountBalanceAfterUnStake);
+    }
+
     //ToDo - need to write tests for the following functions -
-    //  updateRewards(), stakeForAccount(), unstake(),
-    //  unstakeForAccount(), transfer(), transferFrom(), claim(), claimForAccount(), claimable(), 
-    //  Notes - balanceOf() to be tested along with stake()
+    //  updateRewards(),
+    //  transfer(), transferFrom(), claim(), claimForAccount(), claimable(), 
 }
