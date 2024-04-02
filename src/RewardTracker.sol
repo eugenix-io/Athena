@@ -134,7 +134,7 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
 
         IERC20(_depositToken).safeTransferFrom(_fundingAccount, address(this), _amount);
 
-        // _updateRewards(_account);
+        _updateRewards(_account);
 
         // ToDo (check) - Performing operation directly since Safemath is inbuilt in soliidty compiler
         stakedAmounts[_account] = stakedAmounts[_account] + _amount;

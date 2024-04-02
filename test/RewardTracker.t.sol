@@ -12,10 +12,17 @@ contract RewardToken is ERC20 {
     }
 }
 
+contract DepositToken is ERC20 {
+    constructor(uint256 initialSupply) ERC20("Mock ERC20 Token", "MCK") {
+        _mint(msg.sender, initialSupply);
+    }
+}
+
 contract RewardTrackerTest is Test {
     RewardDistributor rewardDistributor;
     RewardTracker rewardTracker;
     RewardToken rewardToken;
+    DepositToken depositToken;
     address accountA;
     address accountB;
     address gov = address(this);
@@ -24,27 +31,26 @@ contract RewardTrackerTest is Test {
         accountA = address(1001);
         accountB = address(1002);
         rewardToken = new RewardToken(1e24);
+        depositToken = new DepositToken(1e24);
         rewardTracker = new RewardTracker('LogX Token', 'LOGX');
         rewardDistributor = new RewardDistributor(address(rewardToken), address(rewardTracker));
         address[] memory depositTokens = new address[](1);
-        depositTokens[0] = address(2);
+        depositTokens[0] = address(depositToken);
         rewardTracker.initialize(depositTokens, address(rewardDistributor));
+        depositToken.transfer(accountB, 100);
     }
 
     function testSetDepositToken() public {
-        address depositToken = address(new RewardToken(1e24));
-        
         vm.prank(gov);
-        rewardTracker.setDepositToken(depositToken, true);
-        assertTrue(rewardTracker.isDepositToken(depositToken));
+        rewardTracker.setDepositToken(address(depositToken), true);
+        assertTrue(rewardTracker.isDepositToken(address(depositToken)));
     }
 
     function testFailSetDepositTokenByNonGov() public {
-        address depositToken = address(new RewardToken(1e24));
         address nonGov = address(0xBEEF);
         
         vm.prank(nonGov);
-        rewardTracker.setDepositToken(depositToken, true);
+        rewardTracker.setDepositToken(address(depositToken), true);
     }
 
     function testSetInPrivateTransferMode() public {
@@ -102,9 +108,34 @@ contract RewardTrackerTest is Test {
         assertEq(rewardTracker.tokensPerInterval(), 100);
     }
 
+    function testStakeAndUnstake() public {
+        uint256 totalSupplyBeforeStake = rewardTracker.totalSupply();
+        uint256 accountBalanceBeforeStake = rewardTracker.balances(address(accountB));
+
+        rewardDistributor.updateLastDistributionTime();
+        rewardDistributor.setTokensPerInterval(100);
+        vm.prank(accountB);
+        depositToken.approve(address(rewardTracker), 100);
+        vm.prank(accountB);
+        rewardTracker.stake(address(depositToken), 100);
+        
+        uint256 totalSupplyAfterStake = rewardTracker.totalSupply();
+        uint256 accountBalanceAfterStake = rewardTracker.balances(address(accountB));
+
+        assertEq(totalSupplyAfterStake - totalSupplyBeforeStake, 100);
+        assertEq(accountBalanceAfterStake - accountBalanceBeforeStake, 100);
+
+        vm.prank(accountB);
+        rewardTracker.unstake(address(depositToken), 100);
+        
+        uint256 totalSupplyAfterUnStake = rewardTracker.totalSupply();
+        uint256 accountBalanceAfterUnStake = rewardTracker.balances(address(accountB));
+        assertEq(totalSupplyBeforeStake, totalSupplyAfterUnStake);
+        assertEq(accountBalanceBeforeStake, accountBalanceAfterUnStake);
+    }
 
     //ToDo - need to write tests for the following functions -
-    //  updateRewards(), stake(), stakeForAccount(), unstake(),
+    //  updateRewards(), stakeForAccount(), unstake(),
     //  unstakeForAccount(), transfer(), transferFrom(), claim(), claimForAccount(), claimable(), 
     //  Notes - balanceOf() to be tested along with stake()
 }
