@@ -26,12 +26,15 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
     string public name;
     string public symbol;
     address public distributor;
+    address public vestingToken;
     bool public isInitialized;
     bool public inPrivateTransferMode;
     bool public inPrivateStakingMode;
     bool public inPrivateClaimingMode;
+    //ToDo - add a variabe to enable / disable vesting
     uint256 public override totalSupply;
     uint256 public cumulativeRewardPerToken;
+    uint256 public vestingDuration;
 
     //Mappings
     mapping (address => bool) public isDepositToken;
@@ -45,9 +48,12 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
     mapping (address => uint256) public override averageStakedAmounts;
     mapping (address => mapping (address => uint256)) public override depositBalances;
     mapping (address => mapping (address => uint256)) public allowances;
+    mapping (address => uint256) public lastVestingTimes;
+    mapping (address => uint256) public cumulativeVestedClaimAmounts;
+        mapping (address => uint256) public claimedVestedAmounts;
 
     //Events
-    event Claim(address receiver, uint256 amount);
+    event Claim(address receiver, address tokenAddress, uint256 amount);
 
     constructor(string memory _name, string memory _symbol) {
         name = _name;
@@ -56,7 +62,9 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
 
     function initialize(
         address[] memory _depositTokens,
-        address _distributor
+        address _distributor,
+        uint256 _vestingDuration,
+        address _vestingToken
     ) external onlyGov {
         require(!isInitialized, "RewardTracker: already initialized");
         isInitialized = true;
@@ -67,6 +75,10 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
         }
 
         distributor = _distributor;
+        vestingDuration = _vestingDuration;
+        //ToDo - vesting token in the reward tracker is the same as deposit token = $LOGX,
+        //  we can remove the deposit token array and replace it with a single logxToken address across the contract
+        vestingToken = _vestingToken;
     }
 
     function setDepositToken(address _depositToken, bool _isDepositToken) external onlyGov {
@@ -254,19 +266,19 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
     }
 
     /**
-        Claim User Flow
+        Claim Rewards User Flow
      */
-    function claim(address _receiver) external override nonReentrant returns(uint256) {
+    function claimRewards(address _receiver) external nonReentrant returns(uint256) {
         if(inPrivateClaimingMode) { revert("RewardTracker: action not enabled"); }
-        return _claim(msg.sender, _receiver);
+        return _claimRewards(msg.sender, _receiver);
     }
 
-    function claimForAccount(address _account, address _receiver) external override nonReentrant returns (uint256) {
+    function claimRewardsForAccount(address _account, address _receiver) external nonReentrant returns (uint256) {
         _validateHandler();
-        return _claim(_account, _receiver);
+        return _claimRewards(_account, _receiver);
     }
 
-    function claimable(address _account) public override view returns (uint256) {
+    function claimableRewards(address _account) public view returns (uint256) {
         uint256 stakedAmount = stakedAmounts[_account];
         if(stakedAmount == 0) {
             return claimableReward[_account];
@@ -277,18 +289,47 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
         return claimableReward[_account] + ((stakedAmount * (nextCumulativeRewardPerToken - previousCumulatedRewardPerToken[_account])) / PRECISION);
     }
 
-    function _claim(address _account, address _receiver) private returns (uint256) {
+    function _claimRewards(address _account, address _receiver) private returns (uint256) {
         _updateRewards(_account);
 
         uint256 tokenAmount = claimableReward[_account];
         claimableReward[_account] = 0;
 
         if(tokenAmount > 0) {
-            IERC20(rewardToken()).safeTransfer(_receiver, tokenAmount);
-            emit Claim(_account, tokenAmount);
+            address rewardTokenAddress = rewardToken();
+            IERC20(rewardTokenAddress).safeTransfer(_receiver, tokenAmount);
+            emit Claim(_account, rewardTokenAddress, tokenAmount);
         }
 
         return tokenAmount;
+    }
+
+    /**
+        Claim Vested Tokens User Flow
+     */
+    function claimVestedTokens() external nonReentrant returns (uint256) {
+        return _claimVestedTokens(msg.sender, msg.sender);
+    }
+
+    function claimVestedTokensForAccount(address _account, address _receiver) external nonReentrant returns (uint256) {
+        _validateHandler();
+        return _claimVestedTokens(_account, _receiver);
+    }
+
+    function _claimVestedTokens(address _account, address _receiver) private returns (uint256) {
+        _updateVesting(_account);
+        uint256 amount = claimableVestedTokens(_account);
+        claimedVestedAmounts[_account] = claimedVestedAmounts[_account] + amount;
+
+        IERC20(vestingToken).safeTransfer(_receiver, amount);
+        emit Claim(_account, vestingToken, amount);
+        return amount;
+    }
+
+    function claimableVestedTokens(address _account) public view returns (uint256) {
+        uint256 amount = cumulativeVestedClaimAmounts[_account] - claimedVestedAmounts[_account];
+        uint256 nextClaimable = _getNextClaimableVestingAmount(_account);
+        return amount + nextClaimable;
     }
 
     /**
@@ -336,5 +377,28 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
                 cumulativeRewards[_account] = nextCumulativeReward;
             }
         }
+    }
+
+    /**
+        Update Vesting
+     */
+     function _updateVesting(address _account) private {
+        uint256 amount = _getNextClaimableVestingAmount(_account);
+        lastVestingTimes[_account] = block.timestamp;
+
+        if(amount == 0) { return; }
+
+        cumulativeVestedClaimAmounts[_account] = cumulativeVestedClaimAmounts[_account] + amount;
+     }
+
+    function _getNextClaimableVestingAmount(address _account) private view returns (uint256) {
+        uint256 timeDiff = block.timestamp - lastVestingTimes[_account];
+
+        uint256 balance = balances[_account];
+        if(balance == 0) { return 0; }
+
+        //ToDo - check again if this logic for vesting is right, for any given time, we will see how much a user is getting from vesting based on the amount of $LOGX tokens staked by the user
+        uint256 claimableAmount = ( balance * timeDiff ) / vestingDuration;
+        return claimableAmount;
     }
 }

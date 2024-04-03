@@ -193,5 +193,5 @@ contract RewardTrackerTest is Test {
 
     //ToDo - need to write tests for the following functions -
     //  updateRewards(),
-    //  transfer(), transferFrom(), claim(), claimForAccount(), claimable(), 
+    //  transfer(), transferFrom(), claimRewards(), claimRewardsForAccount(), claimableRewards(), 
 }
