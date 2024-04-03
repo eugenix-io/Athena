@@ -36,7 +36,7 @@ contract RewardTrackerTest is Test {
         rewardDistributor = new RewardDistributor(address(rewardToken), address(rewardTracker));
         address[] memory depositTokens = new address[](1);
         depositTokens[0] = address(depositToken);
-        rewardTracker.initialize(depositTokens, address(rewardDistributor));
+        rewardTracker.initialize(depositTokens, address(rewardDistributor), 1000, address(depositToken));
         depositToken.transfer(accountB, 100);
         depositToken.transfer(accountA, 100);
     }
@@ -192,6 +192,6 @@ contract RewardTrackerTest is Test {
     }
 
     //ToDo - need to write tests for the following functions -
-    //  updateRewards(),
     //  transfer(), transferFrom(), claimRewards(), claimRewardsForAccount(), claimableRewards(), 
+    //  
 }

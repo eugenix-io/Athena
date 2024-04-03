@@ -34,7 +34,7 @@ contract RewardDistributorTest is Test {
         rewardDistributor = new RewardDistributor(address(rewardToken), address(rewardTracker));
         address[] memory depositTokens = new address[](1);
         depositTokens[0] = address(2);
-        rewardTracker.initialize(depositTokens, address(rewardDistributor));
+        rewardTracker.initialize(depositTokens, address(rewardDistributor), 1000, address(2));
         rewardToken.transfer(address(rewardDistributor), 500 ether); // Simulate funding the contract
     }
 
