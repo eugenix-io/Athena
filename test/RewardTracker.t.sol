@@ -125,6 +125,7 @@ contract RewardTrackerTest is Test {
         vm.warp(block.timestamp + 1 hours);
         rewardTracker.updateRewards();
         uint256 cumulativeRewardsAfterUpdate = rewardTracker.cumulativeRewardPerToken();
+        //ToDo - optimise this test to calculate the exact amount of cumulative rewards added
         assertEq(cumulativeRewardsAfterUpdate > cumulativeRewardsBeforeUpdate, true);
     }
 
