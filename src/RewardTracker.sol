@@ -147,6 +147,7 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
         IERC20(_depositToken).safeTransferFrom(_fundingAccount, address(this), _amount);
 
         _updateRewards(_account);
+        _updateVesting(_account);
 
         // ToDo (check) - Performing operation directly since Safemath is inbuilt in soliidty compiler
         stakedAmounts[_account] = stakedAmounts[_account] + _amount;
@@ -184,6 +185,7 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
         require(isDepositToken[_depositToken], "RewardTracker: invalid _depositToken");
 
         _updateRewards(_account);
+        _updateVesting(_account);
 
         uint256 stakedAmount = stakedAmounts[_account];
         require(stakedAmount >= _amount, "RewardTracker: _amount exceeds stakedAmount");
@@ -252,6 +254,7 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
     }
 
     function _transfer(address _sender, address _recipient, uint256 _amount) private {
+        //ToDo (question) - should we run updateRewards() and updateVesting() when user transfer's their staked $LOGX ?
         require(_sender != address(0), "RewardTracker: transfer from zero address");
         require(_recipient != address(0), "RewardTracker: transfer from zero address");
 
@@ -344,7 +347,7 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
      */
     function _updateRewards(address _account) internal {
         uint256 blockReward = IRewardDistributor(distributor).distribute();
-
+        
         uint256 supply = totalSupply;
         //ToDo (check) - is cumulative reward per token being updated correctly ? when we initialise _cumulativeRewardPerToken, it is initialising with value of 0 ?
         uint256 _cumulativeRewardPerToken = cumulativeRewardPerToken;
@@ -353,7 +356,7 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
             _cumulativeRewardPerToken = _cumulativeRewardPerToken + (blockReward * PRECISION) / supply;
             cumulativeRewardPerToken = _cumulativeRewardPerToken;
         }
-
+        
         //If cumulative rewards per token is 0, it means that there are no rewards yet
         if(cumulativeRewardPerToken == 0) {
             return;

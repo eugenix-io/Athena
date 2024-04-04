@@ -39,6 +39,8 @@ contract RewardTrackerTest is Test {
         rewardTracker.initialize(depositTokens, address(rewardDistributor), 1000, address(depositToken));
         depositToken.transfer(accountB, 100);
         depositToken.transfer(accountA, 100);
+        depositToken.transfer(address(rewardTracker), 10000000000);
+        rewardToken.transfer(address(rewardDistributor), 10000000000);
     }
 
     function testSetDepositToken() public {
@@ -191,7 +193,125 @@ contract RewardTrackerTest is Test {
         assertEq(accountBalanceBeforeStake, accountBalanceAfterUnStake);
     }
 
-    //ToDo - need to write tests for the following functions -
-    //  transfer(), transferFrom(), claimRewards(), claimRewardsForAccount(), claimableRewards(), 
-    //  
+    function testTransfer() public {
+        //Stake funds to create st$LOGX
+        rewardDistributor.updateLastDistributionTime();
+        rewardDistributor.setTokensPerInterval(100);
+        vm.prank(accountA);
+        depositToken.approve(address(rewardTracker), 100);
+        vm.prank(accountA);
+        rewardTracker.stake(address(depositToken), 100);
+
+        vm.startPrank(accountA);
+        bool success = rewardTracker.transfer(accountB, 50);
+        vm.stopPrank();
+
+        assertTrue(success, "Transfer failed");
+        assertEq(rewardTracker.balanceOf(accountA), 50, "Incorrect balance for accountA after transfer");
+        assertEq(rewardTracker.balanceOf(accountB), 50, "Incorrect balance for accountB after transfer");
+    }
+
+    function testTransferFrom() public {
+        rewardDistributor.updateLastDistributionTime();
+        rewardDistributor.setTokensPerInterval(100);
+        vm.prank(accountA);
+        depositToken.approve(address(rewardTracker), 100);
+        vm.prank(accountA);
+        rewardTracker.stake(address(depositToken), 100);
+
+        vm.prank(accountA);
+        rewardTracker.approve(address(this), 50);
+
+        bool success = rewardTracker.transferFrom(accountA, accountB, 50);
+
+        assertTrue(success, "TransferFrom failed");
+        assertEq(rewardTracker.balanceOf(accountA), 50, "Incorrect balance for accountA after transferFrom");
+        assertEq(rewardTracker.balanceOf(accountB), 50, "Incorrect balance for accountB after transferFrom");
+    }
+
+    function testClaimRewards() public {
+        //Stake to accrue rewards
+        rewardDistributor.updateLastDistributionTime();
+        rewardDistributor.setTokensPerInterval(100);
+        vm.prank(accountA);
+        depositToken.approve(address(rewardTracker), 100);
+        vm.prank(accountA);
+        rewardTracker.stake(address(depositToken), 100);
+
+        vm.warp(block.timestamp + 10 hours);
+        uint256 expectedRewards = rewardTracker.claimableRewards(accountA);
+        
+        vm.startPrank(accountA);
+        uint256 claimedRewards = rewardTracker.claimRewards(accountA);
+        vm.stopPrank();
+
+        assertTrue(claimedRewards == expectedRewards, "Claimed rewards do not match expected amount.");
+        assertEq(rewardTracker.claimableRewards(accountA), 0, "Claimable rewards should be zero after claiming.");
+    }
+
+    function testClaimRewardsForAccount() public {
+        rewardDistributor.updateLastDistributionTime();
+        rewardDistributor.setTokensPerInterval(100);
+        vm.prank(accountA);
+        depositToken.approve(address(rewardTracker), 100);
+        vm.prank(accountA);
+        rewardTracker.stake(address(depositToken), 100);
+
+        vm.warp(block.timestamp + 10 hours);
+        uint256 expectedRewards = rewardTracker.claimableRewards(accountA);
+        
+        address handlerMock = address(150);
+        rewardTracker.setHandler(handlerMock, true);
+        address receiver = accountB;
+        
+        vm.startPrank(handlerMock);
+        uint256 claimedRewards = rewardTracker.claimRewardsForAccount(accountA, receiver);
+        vm.stopPrank();
+        
+        assertTrue(claimedRewards == expectedRewards, "Claimed rewards do not match expected amount.");
+        assertEq(rewardTracker.claimableRewards(accountA), 0, "Claimable rewards should be zero after claiming.");
+    }
+
+    function testClaimVestedTokens() public {
+        //Stake to accrue rewards
+        rewardDistributor.updateLastDistributionTime();
+        rewardDistributor.setTokensPerInterval(100);
+        vm.prank(accountA);
+        depositToken.approve(address(rewardTracker), 100);
+        vm.prank(accountA);
+        rewardTracker.stake(address(depositToken), 100);
+
+        vm.warp(block.timestamp + 10 hours);
+        uint256 expectedVestedTokens = rewardTracker.claimableVestedTokens(accountA);
+        
+        vm.startPrank(accountA);
+        uint256 claimedTokens = rewardTracker.claimVestedTokens();
+        vm.stopPrank();
+        
+        assertEq(claimedTokens, expectedVestedTokens, "Claimed vested tokens do not match expected amount.");
+        assertEq(rewardTracker.claimableVestedTokens(accountA), 0, "Claimable vested tokens should be zero after claiming.");
+    }
+
+    function testClaimVestedTokensForAccount() public {
+        rewardDistributor.updateLastDistributionTime();
+        rewardDistributor.setTokensPerInterval(100);
+        vm.prank(accountA);
+        depositToken.approve(address(rewardTracker), 100);
+        vm.prank(accountA);
+        rewardTracker.stake(address(depositToken), 100);
+
+        vm.warp(block.timestamp + 10 hours);
+        uint256 expectedVestedTokens = rewardTracker.claimableVestedTokens(accountA);
+
+        address handlerMock = address(150);
+        rewardTracker.setHandler(handlerMock, true);
+        address receiver = accountB;
+
+        vm.startPrank(handlerMock);
+        uint256 claimedTokensForAccount = rewardTracker.claimVestedTokensForAccount(accountA, receiver);
+        vm.stopPrank();
+
+        assertEq(claimedTokensForAccount, expectedVestedTokens, "Claimed vested tokens do not match the expected amount for accountA.");
+        assertEq(rewardTracker.claimableVestedTokens(accountA), 0, "Claimable vested tokens should be zero for accountA after claiming.");
+    }
 }
