@@ -143,7 +143,8 @@ contract RewardTrackerTest is Test {
         assertEq(balanceAfter - balanceBefore, 50000000000000000000);
         assertEq(totalSupplyAfter - totalSupplyBefore, 50000000000000000000);
 
-        bytes32 stakeId = rewardTracker.userIds(address(accountA), 0);
+        bytes32[] memory stakeIds = rewardTracker.getUserIds(accountA);
+        bytes32 stakeId = stakeIds[0];
         uint256 amountStaked = rewardTracker.getAmountForStakeId(stakeId);
         address accountStaked = rewardTracker.getAccountForStakeId(stakeId);
         assertEq(amountStaked, 50000000000000000000);
@@ -157,7 +158,8 @@ contract RewardTrackerTest is Test {
         rewardTracker.stake(address(depositToken), 50000000000000000000, 7);
         vm.stopPrank();
 
-        bytes32 stakeId = rewardTracker.userIds(address(accountA), 0);
+        bytes32[] memory stakeIds = rewardTracker.getUserIds(accountA);
+        bytes32 stakeId = stakeIds[0];
         //Testing unstake logic 
         uint256 stakedAmountBefore = rewardTracker.stakedAmounts(address(accountA));
         uint256 totalDepositSupplyBefore = rewardTracker.totalDepositSupply();
@@ -208,7 +210,8 @@ contract RewardTrackerTest is Test {
         assertEq(balanceAfter - balanceBefore, 50000000000000000000);
         assertEq(totalSupplyAfter - totalSupplyBefore, 50000000000000000000);
 
-        bytes32 stakeId = rewardTracker.userIds(address(accountA), 0);
+        bytes32[] memory stakeIds = rewardTracker.getUserIds(accountA);
+        bytes32 stakeId = stakeIds[0];
         uint256 amountStaked = rewardTracker.getAmountForStakeId(stakeId);
         address accountStaked = rewardTracker.getAccountForStakeId(stakeId);
         assertEq(amountStaked, 50000000000000000000);
@@ -226,7 +229,8 @@ contract RewardTrackerTest is Test {
         rewardTracker.stake(address(depositToken), 50000000000000000000, 7);
         vm.stopPrank();
 
-        bytes32 stakeId = rewardTracker.userIds(address(accountA), 0);
+        bytes32[] memory stakeIds = rewardTracker.getUserIds(accountA);
+        bytes32 stakeId = stakeIds[0];
         //Testing unstake logic 
         uint256 stakedAmountBefore = rewardTracker.stakedAmounts(address(accountA));
         uint256 totalDepositSupplyBefore = rewardTracker.totalDepositSupply();
@@ -257,7 +261,8 @@ contract RewardTrackerTest is Test {
         rewardTracker.stake(address(depositToken), 50000000000000000000, 7);
         vm.stopPrank();
 
-        bytes32 stakeId = rewardTracker.userIds(address(accountA), 0);
+        bytes32[] memory stakeIds = rewardTracker.getUserIds(accountA);
+        bytes32 stakeId = stakeIds[0];
 
         vm.startPrank(accountA);
         vm.expectRevert("RewardTracker: staking duration active");
@@ -272,7 +277,8 @@ contract RewardTrackerTest is Test {
         rewardTracker.stake(address(depositToken), 50000000000000000000, 7);
         vm.stopPrank();
 
-        bytes32 stakeId = rewardTracker.userIds(address(accountA), 0);
+        bytes32[] memory stakeIds = rewardTracker.getUserIds(accountA);
+        bytes32 stakeId = stakeIds[0];
 
         vm.startPrank(accountB);
         vm.expectRevert("RewardTracker: invalid _stakeId for _account");

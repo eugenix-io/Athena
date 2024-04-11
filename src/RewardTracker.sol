@@ -132,8 +132,15 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
         return stakes[stakeId].account;
     }
 
-    //ToDo - write a function to get all the stakedIDs of a given user
+    function getUserIds(address _user) public view returns (bytes32[] memory) {
+        return userIds[_user];
+    }
 
+    function getStake(bytes32 stakeId) public view returns (Stake memory) {
+        require(stakes[stakeId].startTime != 0, "Stake does not exist.");
+        return stakes[stakeId];
+    }
+    
     /**
         Approve User Flow
      */
