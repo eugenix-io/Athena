@@ -315,6 +315,54 @@ contract RewardTrackerTest is Test {
         assertEq(rewardTracker.balanceOf(accountA), 25000000000000000000, "Incorrect balance for accountA after transferFrom");
         assertEq(rewardTracker.balanceOf(accountB), 25000000000000000000, "Incorrect balance for accountB after transferFrom");
     }
+
+    function testClaimVestedTokens() public {
+        //To test for the vesting math, we will deposit
+        // 91.25 tokens for 30 days at 20% APR, earning 1.5 tokens at the end of vesting period
+        //Using Account 'A' to Stake
+        vm.startPrank(accountA);
+        depositToken.approve(address(rewardTracker), 91250000000000000000);
+        rewardTracker.stake(address(depositToken), 91250000000000000000, 30);
+        vm.stopPrank();
+
+        bytes32[] memory stakeIds = rewardTracker.getUserIds(accountA);
+        bytes32 stakeId = stakeIds[0];
         
-    //ToDo - claimVestedTokens(), claimVestedTokensForAccount()
+        //Simulate passage of time so staking duration ends
+        vm.warp(31 days);
+        vm.startPrank(accountA);
+        rewardTracker.unstake(address(depositToken), stakeId);
+        uint256 amount = rewardTracker.claimVestedTokens();
+        vm.stopPrank();
+
+        assertEq(amount, 1500000000000000000, "Incorrect vested tokens");
+    }
+
+    function testClaimVestedTokensForAccount() public {
+        vm.prank(gov);
+        address handlerMock = address(150);
+        rewardTracker.setHandler(handlerMock, true);
+
+        //To test for the vesting math, we will deposit
+        // 91.25 tokens for 30 days at 20% APR, earning 1.5 tokens at the end of vesting period
+        //Using Account 'A' to Stake
+        vm.startPrank(accountA);
+        depositToken.approve(address(rewardTracker), 91250000000000000000);
+        rewardTracker.stake(address(depositToken), 91250000000000000000, 30);
+        vm.stopPrank();
+
+        bytes32[] memory stakeIds = rewardTracker.getUserIds(accountA);
+        bytes32 stakeId = stakeIds[0];
+        
+        //Simulate passage of time so staking duration ends
+        vm.warp(31 days);
+        vm.startPrank(accountA);
+        rewardTracker.unstake(address(depositToken), stakeId);
+        vm.stopPrank();
+
+        vm.prank(address(150));
+        uint256 amount = rewardTracker.claimVestedTokensForAccount(address(accountA), address(accountA));
+
+        assertEq(amount, 1500000000000000000, "Incorrect vested tokens");
+    }
 }
