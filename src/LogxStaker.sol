@@ -9,11 +9,13 @@ pragma solidity ^0.8.19;
 import "../libraries/token/IERC20.sol";
 import "../libraries/token/SafeERC20.sol";
 import "../libraries/utils/ReentrancyGuard.sol";
-
-import "./interfaces/ILogxStaker.sol";
 import "../access/Governable.sol";
 
-contract LogxStaker is IERC20, ReentrancyGuard, ILogxStaker, Governable {
+//Interfaces
+import "./interfaces/IRewardDistributor.sol";
+import "./interfaces/ILogxStaker.sol";
+
+contract LogxStaker is IERC20, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
 
     //Constants
@@ -26,12 +28,14 @@ contract LogxStaker is IERC20, ReentrancyGuard, ILogxStaker, Governable {
     string public symbol;
     address public vestingToken;
     address public depositToken;
+    address public distributor;
     bool public isInitialized;
     bool public inPrivateTransferMode;
     bool public inPrivateStakingMode;
     bool public inPrivateClaimingMode;
     uint256 public override totalSupply;
     uint256 public totalDepositSupply;
+    uint256 public cumulativeFeeRewardPerToken;
 
     //Mappings
     mapping (address => bool) public isHandler;
@@ -46,6 +50,10 @@ contract LogxStaker is IERC20, ReentrancyGuard, ILogxStaker, Governable {
     mapping (address => uint256) public claimableVestedTokens;
     //ToDo - we could remove user nonce to save gas if needed
     mapping(address => uint256) private userNonces;
+    mapping (address => uint256) public previousCumulatedFeeRewardPerToken;
+    mapping (address => uint256) public claimableFeeReward;
+    mapping (address => uint256) public cumulativeFeeRewards;
+    mapping (address => uint256) public averageStakedAmounts;
 
     //Events
     event Claim(address receiver, address tokenAddress, uint256 amount);
@@ -68,13 +76,15 @@ contract LogxStaker is IERC20, ReentrancyGuard, ILogxStaker, Governable {
 
     function initialize(
         address _vestingToken,
-        address _depositToken
+        address _depositToken,
+        address _distributor
     ) external onlyGov {
         require(!isInitialized, "LogxStaker: already initialized");
         isInitialized = true;
 
         vestingToken = _vestingToken;
         depositToken = _depositToken;
+        distributor = _distributor;
 
         //Initialising $LOGX vesting APRs with pre-defined values
         // We add APR values considering the BASIS_POINTS_DIVISOR which is 10^4.
@@ -116,11 +126,11 @@ contract LogxStaker is IERC20, ReentrancyGuard, ILogxStaker, Governable {
         IERC20(_token).safeTransfer(_account, _amount);
     }
 
-    function balanceOf(address _account) external view override(IERC20, ILogxStaker) returns (uint256) {
+    function balanceOf(address _account) external view override returns (uint256) {
         return balances[_account];
     }
 
-    function allowance(address _owner, address _spender) external view override(IERC20, ILogxStaker) returns(uint256) {
+    function allowance(address _owner, address _spender) external view override returns(uint256) {
         return allowances[_owner][_spender];
     }
 
@@ -140,11 +150,20 @@ contract LogxStaker is IERC20, ReentrancyGuard, ILogxStaker, Governable {
         require(stakes[stakeId].startTime != 0, "Stake does not exist.");
         return stakes[stakeId];
     }
+
+    function updateFeeRewards() external nonReentrant {
+        _updateFeeRewards(address(0));
+    }
+
+    function rewardToken() public view returns(address) {
+        return IRewardDistributor(distributor).rewardToken();
+    }
+
     
     /**
         Approve User Flow
      */
-    function approve(address _spender, uint256 _amount) external override(IERC20, ILogxStaker) returns(bool) {
+    function approve(address _spender, uint256 _amount) external override returns(bool) {
         _approve(msg.sender, _spender, _amount);
         return true;
     }
@@ -161,12 +180,12 @@ contract LogxStaker is IERC20, ReentrancyGuard, ILogxStaker, Governable {
     /**
         Transfer User Flow
      */
-    function transfer(address _recipient, uint256 _amount) external override(IERC20, ILogxStaker) returns(bool) {
+    function transfer(address _recipient, uint256 _amount) external override returns(bool) {
         _transfer(msg.sender, _recipient, _amount);
         return true;
     }
 
-    function transferFrom(address _sender, address _recipient, uint256 _amount) external override(IERC20, ILogxStaker) returns(bool) {
+    function transferFrom(address _sender, address _recipient, uint256 _amount) external override returns(bool) {
         if(isHandler[msg.sender]) {
             _transfer(_sender, _recipient, _amount);
             return true;
@@ -227,6 +246,8 @@ contract LogxStaker is IERC20, ReentrancyGuard, ILogxStaker, Governable {
 
         IERC20(_depositToken).safeTransferFrom(_fundingAccount, address(this), _amount);
 
+        _updateFeeRewards(_account);
+
         stakedAmounts[_account] = stakedAmounts[_account] + _amount;
         totalDepositSupply = totalDepositSupply + _amount;
 
@@ -275,13 +296,15 @@ contract LogxStaker is IERC20, ReentrancyGuard, ILogxStaker, Governable {
         require(_depositToken == depositToken, "LogxStaker: invalid _depositToken");
         require(!isStakeActive(stakeId), "LogxStaker: staking duration active");
 
+        _updateFeeRewards(_account);
+        //ToDo - Calculate the amount of tokens vested for the user
+        _updateVestedRewards(_account, stakeId);
+
         uint256 amount = getAmountForStakeId(stakeId);
         
         stakedAmounts[_account] = stakedAmounts[_account] - amount;
         totalDepositSupply = totalDepositSupply - amount;
 
-        //ToDo - Calculate the amount of tokens vested for the user
-        _updateVestedRewards(_account, stakeId);
         _removeStake(_account, stakeId);
         _burn(_account, amount);
 
@@ -297,6 +320,45 @@ contract LogxStaker is IERC20, ReentrancyGuard, ILogxStaker, Governable {
         totalSupply = totalSupply - _amount;
 
         emit Transfer(_account, address(0), _amount);
+    }
+
+    /**
+        Claim Rewards User Flow
+     */
+    function claimFeeRewards(address _receiver) external nonReentrant returns(uint256) {
+        if(inPrivateClaimingMode) { revert("RewardTracker: action not enabled"); }
+        return _claimFeeRewards(msg.sender, _receiver);
+    }
+
+    function claimFeeRewardsForAccount(address _account, address _receiver) external nonReentrant returns (uint256) {
+        _validateHandler();
+        return _claimFeeRewards(_account, _receiver);
+    }
+
+    function claimableFeeRewards(address _account) public view returns (uint256) {
+        uint256 stakedAmount = stakedAmounts[_account];
+        if(stakedAmount == 0) {
+            return claimableFeeReward[_account];
+        }
+        uint256 supply = totalSupply;
+        uint256 pendingRewards = IRewardDistributor(distributor).pendingRewards() * PRECISION;
+        uint256 nextCumulativeRewardPerToken = cumulativeFeeRewardPerToken + (pendingRewards / supply);
+        return claimableFeeReward[_account] + ((stakedAmount * (nextCumulativeRewardPerToken - previousCumulatedFeeRewardPerToken[_account])) / PRECISION);
+    }
+
+    function _claimFeeRewards(address _account, address _receiver) private returns (uint256) {
+        _updateFeeRewards(_account);
+
+        uint256 tokenAmount = claimableFeeReward[_account];
+        claimableFeeReward[_account] = 0;
+
+        if(tokenAmount > 0) {
+            address rewardTokenAddress = rewardToken();
+            IERC20(rewardTokenAddress).safeTransfer(_receiver, tokenAmount);
+            emit Claim(_account, rewardTokenAddress, tokenAmount);
+        }
+
+        return tokenAmount;
     }
 
     /**
@@ -415,5 +477,42 @@ contract LogxStaker is IERC20, ReentrancyGuard, ILogxStaker, Governable {
         uint256 vestedTokens = ( userStake.amount * userStake.apy * userStake.duration ) / ( 365 * 100 * 10000 );
         cumulativeVestedTokens[_account] = cumulativeVestedTokens[_account] + vestedTokens;
         claimableVestedTokens[_account] = claimableVestedTokens[_account] + vestedTokens;
+    }
+
+    function _updateFeeRewards(address _account) internal {
+        uint256 blockReward = IRewardDistributor(distributor).distribute();
+        
+        uint256 supply = totalSupply;
+        //ToDo (check) - is cumulative reward per token being updated correctly ? when we initialise _cumulativeRewardPerToken, it is initialising with value of 0 ?
+        uint256 _cumulativeFeeRewardPerToken = cumulativeFeeRewardPerToken;
+        if(supply > 0 && blockReward > 0) {
+            // ToDo (check) - Perofrming operation directly since Safemath is inbuilt in solidity compiler
+            _cumulativeFeeRewardPerToken = _cumulativeFeeRewardPerToken + (blockReward * PRECISION) / supply;
+            cumulativeFeeRewardPerToken = _cumulativeFeeRewardPerToken;
+        }
+        
+        //If cumulative rewards per token is 0, it means that there are no rewards yet
+        if(cumulativeFeeRewardPerToken == 0) {
+            return;
+        }
+
+        if(_account != address(0)) {
+            uint256 stakedAmount = stakedAmounts[_account];
+            // ToDo (check) - Performing operation directly since Safemath is inbuilt in solidity compiler
+            uint256 accountReward = (stakedAmount * (_cumulativeFeeRewardPerToken - previousCumulatedFeeRewardPerToken[_account])) / PRECISION;
+            uint256 _claimableFeeReward = claimableFeeReward[_account] + accountReward;
+
+            claimableFeeReward[_account] = _claimableFeeReward;
+            previousCumulatedFeeRewardPerToken[_account] = _cumulativeFeeRewardPerToken;
+
+            if(_claimableFeeReward > 0 && stakedAmounts[_account] > 0){
+                // ToDo (check) - will cumulativeRewards[_account] be initialised with value of 0?
+                uint256 nextCumulativeReward = cumulativeFeeRewards[_account] + accountReward;
+
+                averageStakedAmounts[_account] = (averageStakedAmounts[_account] * cumulativeFeeRewards[_account] / nextCumulativeReward) + (stakedAmount * accountReward / nextCumulativeReward);
+
+                cumulativeFeeRewards[_account] = nextCumulativeReward;
+            }
+        }
     }
 }
