@@ -10,10 +10,10 @@ import "../libraries/token/IERC20.sol";
 import "../libraries/token/SafeERC20.sol";
 import "../libraries/utils/ReentrancyGuard.sol";
 
-import "./interfaces/IRewardTracker.sol";
+import "./interfaces/ILogxStaker.sol";
 import "../access/Governable.sol";
 
-contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
+contract LogxStaker is IERC20, ReentrancyGuard, ILogxStaker, Governable {
     using SafeERC20 for IERC20;
 
     //Constants
@@ -70,7 +70,7 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
         address _vestingToken,
         address _depositToken
     ) external onlyGov {
-        require(!isInitialized, "RewardTracker: already initialized");
+        require(!isInitialized, "LogxStaker: already initialized");
         isInitialized = true;
 
         vestingToken = _vestingToken;
@@ -116,11 +116,11 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
         IERC20(_token).safeTransfer(_account, _amount);
     }
 
-    function balanceOf(address _account) external view override(IERC20, IRewardTracker) returns (uint256) {
+    function balanceOf(address _account) external view override(IERC20, ILogxStaker) returns (uint256) {
         return balances[_account];
     }
 
-    function allowance(address _owner, address _spender) external view override(IERC20, IRewardTracker) returns(uint256) {
+    function allowance(address _owner, address _spender) external view override(IERC20, ILogxStaker) returns(uint256) {
         return allowances[_owner][_spender];
     }
 
@@ -144,14 +144,14 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
     /**
         Approve User Flow
      */
-    function approve(address _spender, uint256 _amount) external override(IERC20, IRewardTracker) returns(bool) {
+    function approve(address _spender, uint256 _amount) external override(IERC20, ILogxStaker) returns(bool) {
         _approve(msg.sender, _spender, _amount);
         return true;
     }
 
     function _approve(address _owner, address _spender, uint256 _amount) private {
-        require(_owner != address(0), "RewardTracker: approve from zero address");
-        require(_spender != address(0), "RewardTracker: approve from zero address");
+        require(_owner != address(0), "LogxStaker: approve from zero address");
+        require(_spender != address(0), "LogxStaker: approve from zero address");
 
         allowances[_owner][_spender] = _amount;
 
@@ -161,18 +161,18 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
     /**
         Transfer User Flow
      */
-    function transfer(address _recipient, uint256 _amount) external override(IERC20, IRewardTracker) returns(bool) {
+    function transfer(address _recipient, uint256 _amount) external override(IERC20, ILogxStaker) returns(bool) {
         _transfer(msg.sender, _recipient, _amount);
         return true;
     }
 
-    function transferFrom(address _sender, address _recipient, uint256 _amount) external override(IERC20, IRewardTracker) returns(bool) {
+    function transferFrom(address _sender, address _recipient, uint256 _amount) external override(IERC20, ILogxStaker) returns(bool) {
         if(isHandler[msg.sender]) {
             _transfer(_sender, _recipient, _amount);
             return true;
         }
 
-        require(allowances[_sender][msg.sender] >= _amount, "RewardTracker: transfer amount exceeds allowance");
+        require(allowances[_sender][msg.sender] >= _amount, "LogxStaker: transfer amount exceeds allowance");
         uint256 nextAllowance = allowances[_sender][msg.sender] - _amount;
         _approve(_sender, msg.sender, nextAllowance);
         _transfer(_sender, _recipient, _amount);
@@ -181,12 +181,12 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
 
     function _transfer(address _sender, address _recipient, uint256 _amount) private {
         //ToDo (question) - should we run updateRewards() and updateVesting() when user transfer's their staked $LOGX ?
-        require(_sender != address(0), "RewardTracker: transfer from zero address");
-        require(_recipient != address(0), "RewardTracker: transfer from zero address");
+        require(_sender != address(0), "LogxStaker: transfer from zero address");
+        require(_recipient != address(0), "LogxStaker: transfer from zero address");
 
         if(inPrivateTransferMode) { _validateHandler(); }
 
-        require(balances[_sender] >= _amount, "RewardTracker: transfer amount exceeds balance");
+        require(balances[_sender] >= _amount, "LogxStaker: transfer amount exceeds balance");
         // ToDo (check) - Performing operation directly since Safemath is inbuilt in soliidty compiler
         balances[_sender] = balances[_sender] - _amount;
         balances[_recipient] = balances[_recipient] + _amount;
@@ -204,7 +204,7 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
         @param _duration will be the duration for which _amount will be staked in DAYS
      */
     function stake(address _depositToken, uint256 _amount, uint256 _duration) external nonReentrant {
-        if(inPrivateStakingMode) { revert("RewardTracker: staking action not enabled"); }
+        if(inPrivateStakingMode) { revert("LogxStaker: staking action not enabled"); }
         _stake(msg.sender, msg.sender, _depositToken, _amount, _duration);
     }
 
@@ -223,7 +223,7 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
 
     function _stake(address _fundingAccount, address _account, address _depositToken, uint256 _amount, uint256 _duration) private {
         require(_amount > 0, "Reward Tracker: invalid amount");
-        require(_depositToken == depositToken, "RewardTracker: invalid _depositToken");
+        require(_depositToken == depositToken, "LogxStaker: invalid _depositToken");
 
         IERC20(_depositToken).safeTransferFrom(_fundingAccount, address(this), _amount);
 
@@ -253,7 +253,7 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
         @param _stakeId is the ID of the stake which has to be unstaked
      */
     function unstake(address _depositToken, bytes32 _stakeId) external nonReentrant {
-        if(inPrivateStakingMode) { revert("RewardTracker: action not enabled"); }
+        if(inPrivateStakingMode) { revert("LogxStaker: action not enabled"); }
         _unstake(msg.sender, _depositToken, msg.sender, _stakeId);
     }
 
@@ -271,9 +271,9 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
 
     function _unstake(address _account, address _depositToken, address _receiver, bytes32 stakeId) private {
         address accountForStakeId = getAccountForStakeId(stakeId);
-        require(accountForStakeId == _account, "RewardTracker: invalid _stakeId for _account");
-        require(_depositToken == depositToken, "RewardTracker: invalid _depositToken");
-        require(!isStakeActive(stakeId), "RewardTracker: staking duration active");
+        require(accountForStakeId == _account, "LogxStaker: invalid _stakeId for _account");
+        require(_depositToken == depositToken, "LogxStaker: invalid _depositToken");
+        require(!isStakeActive(stakeId), "LogxStaker: staking duration active");
 
         uint256 amount = getAmountForStakeId(stakeId);
         
@@ -289,8 +289,8 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
     }
 
     function _burn(address _account, uint256 _amount) internal {
-        require(_account != address(0), "RewardTracker: burn from zero address");
-        require(balances[_account] >= _amount, "RewardTracker: burn amount exceeds balance");
+        require(_account != address(0), "LogxStaker: burn from zero address");
+        require(balances[_account] >= _amount, "LogxStaker: burn amount exceeds balance");
 
         // ToDo (check) - Performing operation directly since Safemath is inbuilt in solidity compiler
         balances[_account] = balances[_account] - _amount;
@@ -408,7 +408,7 @@ contract RewardTracker is IERC20, ReentrancyGuard, IRewardTracker, Governable {
         //  If this function is ever called outside _unstake, we have to add the following, and more checks if needed.
         // if(isStakeActive(stakeId)) { return; }
         // address accountForStakeId = getAccountForStakeId(stakeId);
-        // require(accountForStakeId == _account, "RewardTracker: Invalid _account for stakeId");
+        // require(accountForStakeId == _account, "LogxStaker: Invalid _account for stakeId");
 
         Stake memory userStake = stakes[stakeId];
         //ToDo - check for arithmetic overflow / underflow

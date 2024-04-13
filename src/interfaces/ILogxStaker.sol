@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-interface IRewardTracker {
+interface ILogxStaker {
     function initialize(address _vestingToken, address _depositToken) external;
     function setInPrivateTransferMode(bool _inPrivateTransferMode) external;
     function setInPrivateStakingMode(bool _inPrivateStakingMode) external;
