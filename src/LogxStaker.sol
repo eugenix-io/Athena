@@ -61,9 +61,11 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
     //Structs
     struct Stake {
         address account;
+        //Amount will be stored in 10^18 terms
         uint256 amount;
         //Duration will be stored in days
         uint256 duration;
+        //Apy will be stored in 10^4 bps terms
         uint256 apy;
         //Start timestamp will be the block.timestamp when the user stakes amount
         uint256 startTime;
@@ -199,14 +201,13 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
     }
 
     function _transfer(address _sender, address _recipient, uint256 _amount) private {
-        //ToDo (question) - should we run updateRewards() and updateVesting() when user transfer's their staked $LOGX ?
+        //ToDo - handle scenario when user is trying to transfer st$LOGX when vesting period is underway
         require(_sender != address(0), "LogxStaker: transfer from zero address");
         require(_recipient != address(0), "LogxStaker: transfer from zero address");
 
         if(inPrivateTransferMode) { _validateHandler(); }
 
         require(balances[_sender] >= _amount, "LogxStaker: transfer amount exceeds balance");
-        // ToDo (check) - Performing operation directly since Safemath is inbuilt in soliidty compiler
         balances[_sender] = balances[_sender] - _amount;
         balances[_recipient] = balances[_recipient] + _amount;
 
@@ -258,7 +259,6 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
     function _mint(address _account, uint256 _amount) internal {
         require(_account != address(0), "Reward Tracker: mint to zero address");
 
-        // ToDo (check) - Performing operation directly since Safemath is inbuilt in solidity compiler
         totalSupply = totalSupply + _amount;
         balances[_account] = balances[_account] + _amount;
 
@@ -297,7 +297,6 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
         require(!isStakeActive(stakeId), "LogxStaker: staking duration active");
 
         _updateFeeRewards(_account);
-        //ToDo - Calculate the amount of tokens vested for the user
         _updateVestedRewards(_account, stakeId);
 
         uint256 amount = getAmountForStakeId(stakeId);
@@ -315,7 +314,6 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
         require(_account != address(0), "LogxStaker: burn from zero address");
         require(balances[_account] >= _amount, "LogxStaker: burn amount exceeds balance");
 
-        // ToDo (check) - Performing operation directly since Safemath is inbuilt in solidity compiler
         balances[_account] = balances[_account] - _amount;
         totalSupply = totalSupply - _amount;
 
@@ -483,10 +481,8 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
         uint256 blockReward = IRewardDistributor(distributor).distribute();
         
         uint256 supply = totalSupply;
-        //ToDo (check) - is cumulative reward per token being updated correctly ? when we initialise _cumulativeRewardPerToken, it is initialising with value of 0 ?
         uint256 _cumulativeFeeRewardPerToken = cumulativeFeeRewardPerToken;
         if(supply > 0 && blockReward > 0) {
-            // ToDo (check) - Perofrming operation directly since Safemath is inbuilt in solidity compiler
             _cumulativeFeeRewardPerToken = _cumulativeFeeRewardPerToken + (blockReward * PRECISION) / supply;
             cumulativeFeeRewardPerToken = _cumulativeFeeRewardPerToken;
         }
@@ -498,7 +494,6 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
 
         if(_account != address(0)) {
             uint256 stakedAmount = stakedAmounts[_account];
-            // ToDo (check) - Performing operation directly since Safemath is inbuilt in solidity compiler
             uint256 accountReward = (stakedAmount * (_cumulativeFeeRewardPerToken - previousCumulatedFeeRewardPerToken[_account])) / PRECISION;
             uint256 _claimableFeeReward = claimableFeeReward[_account] + accountReward;
 
@@ -506,7 +501,6 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
             previousCumulatedFeeRewardPerToken[_account] = _cumulativeFeeRewardPerToken;
 
             if(_claimableFeeReward > 0 && stakedAmounts[_account] > 0){
-                // ToDo (check) - will cumulativeRewards[_account] be initialised with value of 0?
                 uint256 nextCumulativeReward = cumulativeFeeRewards[_account] + accountReward;
 
                 averageStakedAmounts[_account] = (averageStakedAmounts[_account] * cumulativeFeeRewards[_account] / nextCumulativeReward) + (stakedAmount * accountReward / nextCumulativeReward);
