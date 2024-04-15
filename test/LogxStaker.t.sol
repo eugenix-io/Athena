@@ -433,4 +433,78 @@ contract logxStakerTest is Test {
 
         assertEq(rewardsA, 86399, "Incorrect rewards distributed for account A");
     }
+
+    function testRestake() public {
+        //Normal staking
+        vm.startPrank(accountA);
+        depositToken.approve(address(logxStaker), 50000000000000000000);
+        logxStaker.stake(address(depositToken), 50000000000000000000, 10);
+        vm.stopPrank();
+
+        bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
+        bytes32 stakeId = stakeIds[0];
+        
+        vm.warp(11 days);
+
+        uint256 stakedAmountBefore = logxStaker.stakedAmounts(address(accountA));
+        uint256 totalDepositSupplyBefore = logxStaker.totalDepositSupply();
+        uint256 balanceBefore = logxStaker.balanceOf(address(accountA));
+        uint256 totalSupplyBefore = logxStaker.totalSupply();
+
+        vm.startPrank(accountA);
+        logxStaker.restake(address(depositToken), stakeId, 15);
+        vm.stopPrank();
+
+        uint256 stakedAmountAfter = logxStaker.stakedAmounts(address(accountA));
+        uint256 totalDepositSupplyAfter = logxStaker.totalDepositSupply();
+        uint256 balanceAfter = logxStaker.balanceOf(address(accountA));
+        uint256 totalSupplyAfter = logxStaker.totalSupply();
+
+        assertEq(stakedAmountAfter, stakedAmountBefore, "Incorrect staked amounts");
+        assertEq(totalDepositSupplyAfter, totalDepositSupplyBefore, "Incorrect total deposit supply");
+        assertEq(balanceBefore, balanceAfter, "Incorrect balances");
+        assertEq(totalSupplyBefore, totalSupplyAfter, "Incorrect total supply");
+
+        LogxStaker.Stake memory stake = logxStaker.getStake(stakeId);
+        assertEq(stake.duration, 15, "Incorrect stake duration");
+    }
+
+    function testRestakeForAccount() public {
+        vm.prank(gov);
+        address handlerMock = address(150);
+        logxStaker.setHandler(handlerMock, true);
+
+        //Normal staking
+        vm.startPrank(accountA);
+        depositToken.approve(address(logxStaker), 50000000000000000000);
+        logxStaker.stake(address(depositToken), 50000000000000000000, 10);
+        vm.stopPrank();
+
+        bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
+        bytes32 stakeId = stakeIds[0];
+        
+        vm.warp(11 days);
+
+        uint256 stakedAmountBefore = logxStaker.stakedAmounts(address(accountA));
+        uint256 totalDepositSupplyBefore = logxStaker.totalDepositSupply();
+        uint256 balanceBefore = logxStaker.balanceOf(address(accountA));
+        uint256 totalSupplyBefore = logxStaker.totalSupply();
+
+        vm.startPrank(address(150));
+        logxStaker.restakeForAccount(address(accountA), address(depositToken), stakeId, 15);
+        vm.stopPrank();
+
+        uint256 stakedAmountAfter = logxStaker.stakedAmounts(address(accountA));
+        uint256 totalDepositSupplyAfter = logxStaker.totalDepositSupply();
+        uint256 balanceAfter = logxStaker.balanceOf(address(accountA));
+        uint256 totalSupplyAfter = logxStaker.totalSupply();
+
+        assertEq(stakedAmountAfter, stakedAmountBefore, "Incorrect staked amounts");
+        assertEq(totalDepositSupplyAfter, totalDepositSupplyBefore, "Incorrect total deposit supply");
+        assertEq(balanceBefore, balanceAfter, "Incorrect balances");
+        assertEq(totalSupplyBefore, totalSupplyAfter, "Incorrect total supply");
+
+        LogxStaker.Stake memory stake = logxStaker.getStake(stakeId);
+        assertEq(stake.duration, 15, "Incorrect stake duration");
+    }
 }

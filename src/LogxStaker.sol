@@ -321,6 +321,28 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
     }
 
     /**
+        Re-staking User Flow
+     */
+    function restake(address _depositToken, bytes32 _stakeId, uint256 _duration) external nonReentrant {
+        if(inPrivateStakingMode) { revert("LogxStaker: action not enabled"); }
+        _restake(msg.sender, _depositToken, _stakeId, _duration);
+    }
+
+    function restakeForAccount(address _account, address _depositToken, bytes32 _stakeId, uint256 _duration) external nonReentrant {
+        _validateHandler();
+        _restake(_account, _depositToken, _stakeId, _duration);
+    }
+
+    function _restake(address _account, address _depositToken, bytes32 _stakeId, uint256 _duration) private {
+        address accountForStakeId = getAccountForStakeId(_stakeId);
+        require(accountForStakeId == _account, "LogxStaker: invalid _stakeId for _account");
+        require(_depositToken == depositToken, "LogxStaker: invalid _depositToken");
+        require(!isStakeActive(_stakeId), "LogxStaker: staking duration active");
+
+        _updateStake(_stakeId, _duration);
+    }
+
+    /**
         Claim Rewards User Flow
      */
     function claimFeeRewards(address _receiver) external nonReentrant returns(uint256) {
@@ -437,18 +459,18 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
     }
 
     //Note - this is the most expensive operation in the contract so far, we have to figure ways to make this gas efficient
-    function _removeStake(address _account, bytes32 stakeId) private {
-        require(stakes[stakeId].startTime != 0, "Stake does not exist.");
+    function _removeStake(address _account, bytes32 _stakeId) private {
+        require(stakes[_stakeId].startTime != 0, "Stake does not exist.");
 
         // Delete the stake from the stakes mapping
-        delete stakes[stakeId];
+        delete stakes[_stakeId];
 
         // Remove the stakeId from the userIds[_account] array
         // We can skip the remaining code in the function if we are okay with user's stake IDs accruing over time even after their expiry
         uint256 index;
         bool found = false;
         for (uint256 i = 0; i < userIds[_account].length; i++) {
-            if (userIds[_account][i] == stakeId) {
+            if (userIds[_account][i] == _stakeId) {
                 index = i;
                 found = true;
                 break;
@@ -461,6 +483,17 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
         } else {
             revert("Stake ID not found for the account.");
         }
+    }
+
+    function _updateStake(bytes32 _stakeId, uint256 _duration) private {
+        require(stakes[_stakeId].startTime != 0, "Stake does not exist");
+
+        uint256 startTime = block.timestamp;
+        uint256 apy = _getApyForDuration(_duration);
+
+        stakes[_stakeId].duration = _duration;
+        stakes[_stakeId].apy = apy;
+        stakes[_stakeId].startTime = startTime;
     }
 
     function _updateVestedRewards(address _account, bytes32 stakeId) private {
