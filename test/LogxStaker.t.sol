@@ -404,4 +404,27 @@ contract logxStakerTest is Test {
         LogxStaker.Stake memory stake = logxStaker.getStake(stakeId);
         assertEq(stake.duration, 15, "Incorrect stake duration");
     }
+
+    //ToDo - write test cases for continuous claim of tokens AND 0 duration stake
+    function testZeroDurationStake() public {
+        //To test for the vesting math, we will deposit
+        // 100 tokens staked with 0 duration for 365 days at 3% APR, earning 3 tokens at the end of vesting period
+        //Using Account 'A' to Stake
+        vm.startPrank(accountA);
+        depositToken.approve(address(logxStaker), 100000000000000000000);
+        logxStaker.stake(address(depositToken), 100000000000000000000, 0);
+        vm.stopPrank();
+
+        bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
+        bytes32 stakeId = stakeIds[0];
+        
+        //Simulate passage of time so staking duration ends
+        vm.warp(365 days);
+        vm.startPrank(accountA);
+        logxStaker.unstake(address(depositToken), stakeId);
+        uint256 amount = logxStaker.claimTokens();
+        vm.stopPrank();
+
+        assertEq(amount, 3000000000000000000, "Incorrect vested tokens");
+    }
 }

@@ -399,17 +399,13 @@ contract LogxStaker is ReentrancyGuard, Governable {
         uint256 lastRewardDistributionTime = lastRewardsTime[_account];
         lastRewardsTime[_account] = block.timestamp;
 
-        uint256 duration;
-        if(block.timestamp >= stakeDurationEndTimestamp) {
+        uint256 duration = block.timestamp - lastRewardDistributionTime;
+        if(userStake.duration != 0 && block.timestamp >= stakeDurationEndTimestamp) {
             duration = lastRewardDistributionTime >= stakeDurationEndTimestamp ? 0 : (stakeDurationEndTimestamp - lastRewardDistributionTime);
-        } else {
-            duration = block.timestamp - lastRewardDistributionTime;
         }
         
         //ToDo - check for precision issues
-        // uint256 scaledAmount = userStake.amount;
         uint256 rewardTokens = ( userStake.amount * userStake.apy * duration ) / ( YEAR_IN_SECONDS * 100 * BASIS_POINTS_DIVISOR);
-        // uint256 rewardTokens = scaledRewardTokens;
         cumulativeTokens[_account] = cumulativeTokens[_account] + rewardTokens;
         claimableTokens[_account] = claimableTokens[_account] + rewardTokens;
     }
