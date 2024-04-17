@@ -12,28 +12,28 @@ import "../libraries/utils/ReentrancyGuard.sol";
 import "../access/Governable.sol";
 
 //Interfaces
-import "./interfaces/IRewardDistributor.sol";
 import "./interfaces/ILogxStaker.sol";
 
-contract LogxStaker is IERC20, ReentrancyGuard, Governable {
+import "forge-std/console.sol";
+
+contract LogxStaker is ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
 
     //Constants
-    uint256 public constant PRECISION = 1e30;
+    uint256 public constant PRECISION = 1e12;
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
+    uint256 constant YEAR_IN_SECONDS = 365 days;
     uint8 public constant decimals = 18;
 
     //Global Variables
     string public name;
     string public symbol;
-    address public vestingToken;
     address public depositToken;
-    address public distributor;
     bool public isInitialized;
     bool public inPrivateTransferMode;
     bool public inPrivateStakingMode;
     bool public inPrivateClaimingMode;
-    uint256 public override totalSupply;
+    uint256 public totalSupply;
     uint256 public totalDepositSupply;
     uint256 public cumulativeFeeRewardPerToken;
 
@@ -41,22 +41,19 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
     mapping (address => bool) public isHandler;
     mapping (address => uint256) public balances;
     mapping (address => uint256) public stakedAmounts;
-    mapping (address => mapping (address => uint256)) public allowances;
     mapping (address => bytes32[]) public userIds;
     mapping (bytes32 => Stake) public stakes;
     //Note - the Apy values will be stored for duration in days
     mapping (uint256 => uint256) public apyForDuration;
-    mapping (address => uint256) public cumulativeVestedTokens;
-    mapping (address => uint256) public claimableVestedTokens;
+    mapping (address => uint256) public cumulativeTokens;
+    mapping (address => uint256) public claimableTokens;
     //ToDo - we could remove user nonce to save gas if needed
     mapping(address => uint256) private userNonces;
-    mapping (address => uint256) public previousCumulatedFeeRewardPerToken;
-    mapping (address => uint256) public claimableFeeReward;
-    mapping (address => uint256) public cumulativeFeeRewards;
-    mapping (address => uint256) public averageStakedAmounts;
+    mapping(address => uint256) private lastRewardsTime;
 
     //Events
     event Claim(address receiver, address tokenAddress, uint256 amount);
+    event Transfer(address indexed from, address indexed to, uint256 value);
 
     //Structs
     struct Stake {
@@ -77,19 +74,16 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
     }
 
     function initialize(
-        address _vestingToken,
-        address _depositToken,
-        address _distributor
+        address _depositToken
     ) external onlyGov {
         require(!isInitialized, "LogxStaker: already initialized");
         isInitialized = true;
 
-        vestingToken = _vestingToken;
         depositToken = _depositToken;
-        distributor = _distributor;
 
         //Initialising $LOGX vesting APRs with pre-defined values
         // We add APR values considering the BASIS_POINTS_DIVISOR which is 10^4.
+        apyForDuration[0] = 30000;
         apyForDuration[7] = 100000;
         apyForDuration[15] = 150000;
         apyForDuration[30] = 200000;
@@ -128,12 +122,8 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
         IERC20(_token).safeTransfer(_account, _amount);
     }
 
-    function balanceOf(address _account) external view override returns (uint256) {
+    function balanceOf(address _account) external view returns (uint256) {
         return balances[_account];
-    }
-
-    function allowance(address _owner, address _spender) external view override returns(uint256) {
-        return allowances[_owner][_spender];
     }
 
     function getAmountForStakeId(bytes32 stakeId) public view returns(uint256) {
@@ -151,67 +141,6 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
     function getStake(bytes32 stakeId) public view returns (Stake memory) {
         require(stakes[stakeId].startTime != 0, "Stake does not exist.");
         return stakes[stakeId];
-    }
-
-    function updateFeeRewards() external nonReentrant {
-        _updateFeeRewards(address(0));
-    }
-
-    function rewardToken() public view returns(address) {
-        return IRewardDistributor(distributor).rewardToken();
-    }
-
-    
-    /**
-        Approve User Flow
-     */
-    function approve(address _spender, uint256 _amount) external override returns(bool) {
-        _approve(msg.sender, _spender, _amount);
-        return true;
-    }
-
-    function _approve(address _owner, address _spender, uint256 _amount) private {
-        require(_owner != address(0), "LogxStaker: approve from zero address");
-        require(_spender != address(0), "LogxStaker: approve from zero address");
-
-        allowances[_owner][_spender] = _amount;
-
-        emit Approval(_owner, _spender, _amount);
-    }
-
-    /**
-        Transfer User Flow
-     */
-    function transfer(address _recipient, uint256 _amount) external override returns(bool) {
-        _transfer(msg.sender, _recipient, _amount);
-        return true;
-    }
-
-    function transferFrom(address _sender, address _recipient, uint256 _amount) external override returns(bool) {
-        if(isHandler[msg.sender]) {
-            _transfer(_sender, _recipient, _amount);
-            return true;
-        }
-
-        require(allowances[_sender][msg.sender] >= _amount, "LogxStaker: transfer amount exceeds allowance");
-        uint256 nextAllowance = allowances[_sender][msg.sender] - _amount;
-        _approve(_sender, msg.sender, nextAllowance);
-        _transfer(_sender, _recipient, _amount);
-        return true;
-    }
-
-    function _transfer(address _sender, address _recipient, uint256 _amount) private {
-        //ToDo - handle scenario when user is trying to transfer st$LOGX when vesting period is underway
-        require(_sender != address(0), "LogxStaker: transfer from zero address");
-        require(_recipient != address(0), "LogxStaker: transfer from zero address");
-
-        if(inPrivateTransferMode) { _validateHandler(); }
-
-        require(balances[_sender] >= _amount, "LogxStaker: transfer amount exceeds balance");
-        balances[_sender] = balances[_sender] - _amount;
-        balances[_recipient] = balances[_recipient] + _amount;
-
-        emit Transfer(_sender, _recipient, _amount);
     }
 
     /**
@@ -247,8 +176,6 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
 
         IERC20(_depositToken).safeTransferFrom(_fundingAccount, address(this), _amount);
 
-        _updateFeeRewards(_account);
-
         stakedAmounts[_account] = stakedAmounts[_account] + _amount;
         totalDepositSupply = totalDepositSupply + _amount;
 
@@ -275,6 +202,7 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
      */
     function unstake(address _depositToken, bytes32 _stakeId) external nonReentrant {
         if(inPrivateStakingMode) { revert("LogxStaker: action not enabled"); }
+        require(!isStakeActive(_stakeId), "LogxStaker: staking duration active");
         _unstake(msg.sender, _depositToken, msg.sender, _stakeId);
     }
 
@@ -294,10 +222,8 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
         address accountForStakeId = getAccountForStakeId(stakeId);
         require(accountForStakeId == _account, "LogxStaker: invalid _stakeId for _account");
         require(_depositToken == depositToken, "LogxStaker: invalid _depositToken");
-        require(!isStakeActive(stakeId), "LogxStaker: staking duration active");
 
-        _updateFeeRewards(_account);
-        _updateVestedRewards(_account, stakeId);
+        _updateRewards(_account, stakeId);
 
         uint256 amount = getAmountForStakeId(stakeId);
         
@@ -339,66 +265,33 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
         require(_depositToken == depositToken, "LogxStaker: invalid _depositToken");
         require(!isStakeActive(_stakeId), "LogxStaker: staking duration active");
 
+        _updateRewards(_account, _stakeId);
         _updateStake(_stakeId, _duration);
     }
 
     /**
-        Claim Rewards User Flow
+        Claim Tokens User Flow
      */
-    function claimFeeRewards(address _receiver) external nonReentrant returns(uint256) {
-        if(inPrivateClaimingMode) { revert("RewardTracker: action not enabled"); }
-        return _claimFeeRewards(msg.sender, _receiver);
+    function claimTokens() external nonReentrant returns (uint256) {
+        return _claimTokens(msg.sender, msg.sender);
     }
 
-    function claimFeeRewardsForAccount(address _account, address _receiver) external nonReentrant returns (uint256) {
+    function claimTokensForAccount(address _account, address _receiver) external nonReentrant returns (uint256) {
         _validateHandler();
-        return _claimFeeRewards(_account, _receiver);
+        return _claimTokens(_account, _receiver);
     }
 
-    function claimableFeeRewards(address _account) public view returns (uint256) {
-        uint256 stakedAmount = stakedAmounts[_account];
-        if(stakedAmount == 0) {
-            return claimableFeeReward[_account];
-        }
-        uint256 supply = totalSupply;
-        uint256 pendingRewards = IRewardDistributor(distributor).pendingRewards() * PRECISION;
-        uint256 nextCumulativeRewardPerToken = cumulativeFeeRewardPerToken + (pendingRewards / supply);
-        return claimableFeeReward[_account] + ((stakedAmount * (nextCumulativeRewardPerToken - previousCumulatedFeeRewardPerToken[_account])) / PRECISION);
-    }
-
-    function _claimFeeRewards(address _account, address _receiver) private returns (uint256) {
-        _updateFeeRewards(_account);
-
-        uint256 tokenAmount = claimableFeeReward[_account];
-        claimableFeeReward[_account] = 0;
-
-        if(tokenAmount > 0) {
-            address rewardTokenAddress = rewardToken();
-            IERC20(rewardTokenAddress).safeTransfer(_receiver, tokenAmount);
-            emit Claim(_account, rewardTokenAddress, tokenAmount);
+    function _claimTokens(address _account, address _receiver) private returns (uint256) {
+        bytes32[] memory userStakeIds = userIds[_account];
+        for(uint256 i=0; i < userStakeIds.length; i++) {
+            _updateRewards(_account, userStakeIds[i]);
         }
 
-        return tokenAmount;
-    }
+        uint256 amount = claimableTokens[_account];
+        claimableTokens[_account] = 0;
 
-    /**
-        Claim Vested Tokens User Flow
-     */
-    function claimVestedTokens() external nonReentrant returns (uint256) {
-        return _claimVestedTokens(msg.sender, msg.sender);
-    }
-
-    function claimVestedTokensForAccount(address _account, address _receiver) external nonReentrant returns (uint256) {
-        _validateHandler();
-        return _claimVestedTokens(_account, _receiver);
-    }
-
-    function _claimVestedTokens(address _account, address _receiver) private returns (uint256) {
-        uint256 amount = claimableVestedTokens[_account];
-        claimableVestedTokens[_account] = 0;
-
-        IERC20(vestingToken).safeTransfer(_receiver, amount);
-        emit Claim(_account, vestingToken, amount);
+        IERC20(depositToken).safeTransfer(_receiver, amount);
+        emit Claim(_account, depositToken, amount);
         return amount;
     }
 
@@ -421,7 +314,7 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
         } else if (_duration >= 7) {
             return apyForDuration[7];
         } else {
-            return 0;
+            return apyForDuration[0];
         }
     }
 
@@ -496,50 +389,28 @@ contract LogxStaker is IERC20, ReentrancyGuard, Governable {
         stakes[_stakeId].startTime = startTime;
     }
 
-    function _updateVestedRewards(address _account, bytes32 stakeId) private {
-        //Note - Following checks have been commented out since this function is currently only being called during _unstake
-        //  If this function is ever called outside _unstake, we have to add the following, and more checks if needed.
-        // if(isStakeActive(stakeId)) { return; }
-        // address accountForStakeId = getAccountForStakeId(stakeId);
-        // require(accountForStakeId == _account, "LogxStaker: Invalid _account for stakeId");
+    function _updateRewards(address _account, bytes32 stakeId) private {
+        address accountForStakeId = getAccountForStakeId(stakeId);
+        require(accountForStakeId == _account, "LogxStaker: Invalid _account for stakeId");
 
         Stake memory userStake = stakes[stakeId];
-        //ToDo - check for arithmetic overflow / underflow
-        uint256 vestedTokens = ( userStake.amount * userStake.apy * userStake.duration ) / ( 365 * 100 * 10000 );
-        cumulativeVestedTokens[_account] = cumulativeVestedTokens[_account] + vestedTokens;
-        claimableVestedTokens[_account] = claimableVestedTokens[_account] + vestedTokens;
-    }
-
-    function _updateFeeRewards(address _account) internal {
-        uint256 blockReward = IRewardDistributor(distributor).distribute();
         
-        uint256 supply = totalSupply;
-        uint256 _cumulativeFeeRewardPerToken = cumulativeFeeRewardPerToken;
-        if(supply > 0 && blockReward > 0) {
-            _cumulativeFeeRewardPerToken = _cumulativeFeeRewardPerToken + (blockReward * PRECISION) / supply;
-            cumulativeFeeRewardPerToken = _cumulativeFeeRewardPerToken;
+        uint256 stakeDurationEndTimestamp = userStake.startTime + (userStake.duration * 1 days) - 1;
+        uint256 lastRewardDistributionTime = lastRewardsTime[_account];
+        lastRewardsTime[_account] = block.timestamp;
+
+        uint256 duration;
+        if(block.timestamp >= stakeDurationEndTimestamp) {
+            duration = lastRewardDistributionTime >= stakeDurationEndTimestamp ? 0 : (stakeDurationEndTimestamp - lastRewardDistributionTime);
+        } else {
+            duration = block.timestamp - lastRewardDistributionTime;
         }
         
-        //If cumulative rewards per token is 0, it means that there are no rewards yet
-        if(cumulativeFeeRewardPerToken == 0) {
-            return;
-        }
-
-        if(_account != address(0)) {
-            uint256 stakedAmount = stakedAmounts[_account];
-            uint256 accountReward = (stakedAmount * (_cumulativeFeeRewardPerToken - previousCumulatedFeeRewardPerToken[_account])) / PRECISION;
-            uint256 _claimableFeeReward = claimableFeeReward[_account] + accountReward;
-
-            claimableFeeReward[_account] = _claimableFeeReward;
-            previousCumulatedFeeRewardPerToken[_account] = _cumulativeFeeRewardPerToken;
-
-            if(_claimableFeeReward > 0 && stakedAmounts[_account] > 0){
-                uint256 nextCumulativeReward = cumulativeFeeRewards[_account] + accountReward;
-
-                averageStakedAmounts[_account] = (averageStakedAmounts[_account] * cumulativeFeeRewards[_account] / nextCumulativeReward) + (stakedAmount * accountReward / nextCumulativeReward);
-
-                cumulativeFeeRewards[_account] = nextCumulativeReward;
-            }
-        }
+        //ToDo - check for precision issues
+        // uint256 scaledAmount = userStake.amount;
+        uint256 rewardTokens = ( userStake.amount * userStake.apy * duration ) / ( YEAR_IN_SECONDS * 100 * BASIS_POINTS_DIVISOR);
+        // uint256 rewardTokens = scaledRewardTokens;
+        cumulativeTokens[_account] = cumulativeTokens[_account] + rewardTokens;
+        claimableTokens[_account] = claimableTokens[_account] + rewardTokens;
     }
 }

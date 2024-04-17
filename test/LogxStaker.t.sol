@@ -3,7 +3,6 @@ pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "../src/LogxStaker.sol";
-import "../src/RewardDistributor.sol";
 import "../libraries/open-zeppelin/ERC20.sol";
 
 contract ERC20Token is ERC20 {
@@ -19,7 +18,6 @@ contract DepositToken is ERC20 {
 }
 
 contract logxStakerTest is Test {
-    RewardDistributor rewardDistributor;
     LogxStaker logxStaker;
     DepositToken depositToken;
     ERC20Token erc20;
@@ -35,15 +33,13 @@ contract logxStakerTest is Test {
         erc20 = new ERC20Token(1e24);
         depositToken = new DepositToken(1e24);
         logxStaker = new LogxStaker('LogX Token', 'LOGX');
-        rewardDistributor = new RewardDistributor(address(erc20), address(logxStaker));
         //Vesting and deposit token are the same ($LOGX token)
-        logxStaker.initialize(address(depositToken), address(depositToken), address(rewardDistributor));
+        logxStaker.initialize(address(depositToken));
 
         //Transfer 100 depositTokens to accountA, accountB and logxStaker (*10^18)
         depositToken.transfer(accountB, 150000000000000000000);
         depositToken.transfer(accountA, 100000000000000000000);
         depositToken.transfer(address(logxStaker), 100000000000000000000);
-        erc20.transfer(address(rewardDistributor), 1000000000);
     }
 
     function testSetInPrivateTransferMode() public {
@@ -92,13 +88,6 @@ contract logxStakerTest is Test {
         logxStaker.withdrawToken(address(erc20), to, amount);
         // Check balance of `to` after withdrawal
         assertEq(erc20.balanceOf(to), amount);
-    }
-
-    function testApproveAndAllowance() public {
-        vm.prank(accountB);
-        logxStaker.approve(accountA, 1000);
-
-        assertEq(logxStaker.allowance(accountB, accountA), 1000);
     }
 
     function testSetAPRForDurationInDaysSuccess() public {
@@ -284,43 +273,15 @@ contract logxStakerTest is Test {
         bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
         bytes32 stakeId = stakeIds[0];
 
+        vm.warp(8 days);
+
         vm.startPrank(accountB);
         vm.expectRevert("LogxStaker: invalid _stakeId for _account");
         logxStaker.unstake(address(depositToken), stakeId);
         vm.stopPrank();
     }
 
-    function testTransfer() public {
-        //We need to stake some amount to make sure the wallet has stLOGX balance for transfer
-        //Using Account 'A' to Stake
-        vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 50000000000000000000);
-        logxStaker.stake(address(depositToken), 50000000000000000000, 7);
-        bool success = logxStaker.transfer(accountB, 25000000000000000000);
-        vm.stopPrank();
-
-        assertTrue(success, "Transfer failed");
-        assertEq(logxStaker.balanceOf(accountA), 25000000000000000000, "Incorrect balance for accountA after transfer");
-        assertEq(logxStaker.balanceOf(accountB), 25000000000000000000, "Incorrect balance for accountB after transfer");
-    }
-
-    function testTransferFrom() public {
-        //We need to stake some amount to make sure the wallet has stLOGX balance for transfer
-        //Using Account 'A' to Stake
-        vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 50000000000000000000);
-        logxStaker.stake(address(depositToken), 50000000000000000000, 7);
-        logxStaker.approve(address(this), 25000000000000000000);
-        vm.stopPrank();
-
-        bool success = logxStaker.transferFrom(accountA, accountB, 25000000000000000000);
-
-        assertTrue(success, "TransferFrom failed");
-        assertEq(logxStaker.balanceOf(accountA), 25000000000000000000, "Incorrect balance for accountA after transferFrom");
-        assertEq(logxStaker.balanceOf(accountB), 25000000000000000000, "Incorrect balance for accountB after transferFrom");
-    }
-
-    function testClaimVestedTokens() public {
+    function testClaimTokens() public {
         //To test for the vesting math, we will deposit
         // 91.25 tokens for 30 days at 20% APR, earning 1.5 tokens at the end of vesting period
         //Using Account 'A' to Stake
@@ -336,13 +297,13 @@ contract logxStakerTest is Test {
         vm.warp(31 days);
         vm.startPrank(accountA);
         logxStaker.unstake(address(depositToken), stakeId);
-        uint256 amount = logxStaker.claimVestedTokens();
+        uint256 amount = logxStaker.claimTokens();
         vm.stopPrank();
 
         assertEq(amount, 1500000000000000000, "Incorrect vested tokens");
     }
 
-    function testClaimVestedTokensForAccount() public {
+    function testClaimTokensForAccount() public {
         vm.prank(gov);
         address handlerMock = address(150);
         logxStaker.setHandler(handlerMock, true);
@@ -365,73 +326,9 @@ contract logxStakerTest is Test {
         vm.stopPrank();
 
         vm.prank(address(150));
-        uint256 amount = logxStaker.claimVestedTokensForAccount(address(accountA), address(accountA));
+        uint256 amount = logxStaker.claimTokensForAccount(address(accountA), address(accountA));
 
         assertEq(amount, 1500000000000000000, "Incorrect vested tokens");
-    }
-
-    //ToDo - add unit test cases for claimFeeRewardsForAccount()
-    function testClaimFeeRewards() public {
-        //Initialise rewards distributor
-        rewardDistributor.updateLastDistributionTime();
-        rewardDistributor.setTokensPerInterval(1);
-
-        //Stake from 2 accounts
-        vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 50000000000000000000);
-        logxStaker.stake(address(depositToken), 50000000000000000000, 10);
-        vm.stopPrank();
-
-        vm.startPrank(accountB);
-        depositToken.approve(address(logxStaker), 150000000000000000000);
-        logxStaker.stake(address(depositToken), 150000000000000000000, 30);
-        vm.stopPrank();
-
-        vm.warp(1 days);
-
-        uint256 claimableRewardsA = logxStaker.claimableFeeRewards(address(accountA));
-        uint256 claimableRewardsB = logxStaker.claimableFeeRewards(address(accountB));
-        vm.prank(accountA);
-        uint256 rewardsA = logxStaker.claimFeeRewards(address(accountA));
-        vm.prank(accountB);
-        uint256 rewardsB = logxStaker.claimFeeRewards(address(accountB));
-
-        //Account A has deposited 50 tokens and Account B has deposited 150 tokens
-        //Account B should get 3X fee rewards as Account A
-        //For duration of 1 day, total rewards distributed will be 60 * 60 * 24 (minus 1 for some reason - could have to do with the way the test case was written)
-        //  with 1 as "token per interval"
-        //Among these tokens, share of Account b - (3/4th) 64,799
-        //  and share of Account a - (1/4th) 21,599
-        assertEq(rewardsB, 64799, "Incorrect rewards distributed for account B");
-        assertEq(rewardsA, 21599, "Incorrect rewards distributed for account A");
-        assertEq(claimableRewardsB, 64799, "Incorrect claimable rewards for account B");
-        assertEq(claimableRewardsA, 21599, "Incorrect claimable rewards for account A");
-    }
-
-    function testClaimFeeRewardsForAccount() public {
-        vm.prank(gov);
-        address handlerMock = address(150);
-        logxStaker.setHandler(handlerMock, true);
-
-        //Initialise rewards distributor
-        rewardDistributor.updateLastDistributionTime();
-        rewardDistributor.setTokensPerInterval(1);
-
-        //Stake from account A
-        vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 50000000000000000000);
-        logxStaker.stake(address(depositToken), 50000000000000000000, 10);
-        vm.stopPrank();
-
-        vm.warp(1 days);
-
-        uint256 claimableRewardsA = logxStaker.claimableFeeRewards(address(accountA));
-        assertEq(claimableRewardsA, 86399, "Incorrect claimable rewards for account A");
-
-        vm.prank(address(150));
-        uint256 rewardsA = logxStaker.claimFeeRewardsForAccount(address(accountA), address(accountA));
-
-        assertEq(rewardsA, 86399, "Incorrect rewards distributed for account A");
     }
 
     function testRestake() public {
