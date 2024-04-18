@@ -14,8 +14,6 @@ import "../access/Governable.sol";
 //Interfaces
 import "./interfaces/ILogxStaker.sol";
 
-import "forge-std/console.sol";
-
 contract LogxStaker is ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
 
@@ -23,6 +21,7 @@ contract LogxStaker is ReentrancyGuard, Governable {
     uint256 public constant PRECISION = 1e12;
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
     uint256 constant YEAR_IN_SECONDS = 365 days;
+
     uint8 public constant decimals = 18;
 
     //Global Variables
@@ -49,7 +48,7 @@ contract LogxStaker is ReentrancyGuard, Governable {
     mapping (address => uint256) public claimableTokens;
     //ToDo - we could remove user nonce to save gas if needed
     mapping(address => uint256) private userNonces;
-    mapping(address => uint256) private lastRewardsTime;
+    mapping(bytes32 => uint256) private lastRewardsTime;
 
     //Events
     event Claim(address receiver, address tokenAddress, uint256 amount);
@@ -281,7 +280,7 @@ contract LogxStaker is ReentrancyGuard, Governable {
         return _claimTokens(_account, _receiver);
     }
 
-    function _claimTokens(address _account, address _receiver) private returns (uint256) {
+    function _claimTokens(address _account, address _receiver) private returns (uint256) {    
         bytes32[] memory userStakeIds = userIds[_account];
         for(uint256 i=0; i < userStakeIds.length; i++) {
             _updateRewards(_account, userStakeIds[i]);
@@ -351,15 +350,13 @@ contract LogxStaker is ReentrancyGuard, Governable {
         userIds[_account].push(stakeId);
     }
 
-    //Note - this is the most expensive operation in the contract so far, we have to figure ways to make this gas efficient
+    //Note - think of ways to make this function more gas efficient
     function _removeStake(address _account, bytes32 _stakeId) private {
         require(stakes[_stakeId].startTime != 0, "Stake does not exist.");
 
         // Delete the stake from the stakes mapping
         delete stakes[_stakeId];
 
-        // Remove the stakeId from the userIds[_account] array
-        // We can skip the remaining code in the function if we are okay with user's stake IDs accruing over time even after their expiry
         uint256 index;
         bool found = false;
         for (uint256 i = 0; i < userIds[_account].length; i++) {
@@ -389,15 +386,13 @@ contract LogxStaker is ReentrancyGuard, Governable {
         stakes[_stakeId].startTime = startTime;
     }
 
+    //Note - following is the most important function in the contract.
     function _updateRewards(address _account, bytes32 stakeId) private {
-        address accountForStakeId = getAccountForStakeId(stakeId);
-        require(accountForStakeId == _account, "LogxStaker: Invalid _account for stakeId");
-
         Stake memory userStake = stakes[stakeId];
         
         uint256 stakeDurationEndTimestamp = userStake.startTime + (userStake.duration * 1 days) - 1;
-        uint256 lastRewardDistributionTime = lastRewardsTime[_account];
-        lastRewardsTime[_account] = block.timestamp;
+        uint256 lastRewardDistributionTime = lastRewardsTime[stakeId];
+        lastRewardsTime[stakeId] = block.timestamp;
 
         uint256 duration = block.timestamp - lastRewardDistributionTime;
         if(userStake.duration != 0 && block.timestamp >= stakeDurationEndTimestamp) {

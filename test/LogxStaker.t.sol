@@ -38,7 +38,7 @@ contract logxStakerTest is Test {
 
         //Transfer 100 depositTokens to accountA, accountB and logxStaker (*10^18)
         depositToken.transfer(accountB, 150000000000000000000);
-        depositToken.transfer(accountA, 100000000000000000000);
+        depositToken.transfer(accountA, 365000000000000000000);
         depositToken.transfer(address(logxStaker), 100000000000000000000);
     }
 
@@ -405,7 +405,6 @@ contract logxStakerTest is Test {
         assertEq(stake.duration, 15, "Incorrect stake duration");
     }
 
-    //ToDo - write test cases for continuous claim of tokens AND 0 duration stake
     function testZeroDurationStake() public {
         //To test for the vesting math, we will deposit
         // 100 tokens staked with 0 duration for 365 days at 3% APR, earning 3 tokens at the end of vesting period
@@ -426,5 +425,81 @@ contract logxStakerTest is Test {
         vm.stopPrank();
 
         assertEq(amount, 3000000000000000000, "Incorrect vested tokens");
+    }
+
+    function testMultipleClaimsWihoutUnstaking() public {
+        //Staking 86400 tokens for 30 days at 20% APR
+        //at the end of day 1, user should earn 0.2 tokens
+        vm.startPrank(accountA);
+        depositToken.approve(address(logxStaker), 365000000000000000000);
+        logxStaker.stake(address(depositToken), 365000000000000000000, 30);
+        vm.stopPrank();
+        
+        //Simulate passage of 2 days
+        vm.warp(2 days);
+        vm.startPrank(accountA);
+        uint256 amount1 = logxStaker.claimTokens();
+        vm.stopPrank();
+
+        assertEq(amount1, 400000000000000000, "Incorrect vested tokens");
+
+        //Simulate passage of another 2 days
+        //Note looks like vm.warp does not stack on the previous vm.warp, hence we have to simulate the passage of 4 days
+        vm.warp(4 days);
+        vm.startPrank(accountA);
+        uint256 amount2 = logxStaker.claimTokens();
+        vm.stopPrank();
+
+        assertEq(amount2, 400000000000000000, "Incorrect vested tokens");
+    }
+
+    //Note that this test is primarily being written to find out the amount of gas consumed
+    function testClaimForMultipleStakeIds() public {
+        uint256 stakeCount = 50;
+        //To test for the vesting math, we will deposit
+        // 9.125 tokens for 30 days at 20% APR 10 times, earning 1.5 tokens at the end of vesting period
+        //Using Account 'A' to Stake
+        vm.startPrank(accountA);
+        uint256 singleStakeAmount = 91250000000000000000 / stakeCount;
+        for (uint256 i=0; i< stakeCount; i++) {
+            depositToken.approve(address(logxStaker), singleStakeAmount);
+            logxStaker.stake(address(depositToken), singleStakeAmount, 30);
+        }
+        vm.stopPrank();
+
+        //Simulate passage of time so staking duration ends
+        vm.warp(31 days);
+        vm.startPrank(accountA);
+        uint256 amount = logxStaker.claimTokens();
+        vm.stopPrank();
+
+        assertEq(amount, 1500000000000000000, "Incorrect vested tokens");
+    }
+
+    //Note that this test is primarily being written to find out the amount of gas consumed
+    function testUnstakeWithMultipleStakeIds() public {
+        uint256 stakeCount = 50;
+        //To test for the vesting math, we will deposit
+        // 9.125 tokens for 30 days at 20% APR 10 times, earning 1.5 tokens at the end of vesting period
+        //Using Account 'A' to Stake
+        vm.startPrank(accountA);
+        uint256 singleStakeAmount = 91250000000000000000 / stakeCount;
+        for (uint256 i=0; i< stakeCount; i++) {
+            depositToken.approve(address(logxStaker), singleStakeAmount);
+            logxStaker.stake(address(depositToken), singleStakeAmount, 30);
+        }
+        vm.stopPrank();
+
+        bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
+        //Simulate passage of time so staking duration ends
+        vm.warp(31 days);
+        vm.startPrank(accountA);
+        for (uint256 i=0; i< stakeIds.length; i++) {
+            logxStaker.unstake(address(depositToken), stakeIds[i]);
+        }
+        uint256 amount = logxStaker.claimTokens();
+        vm.stopPrank();
+
+        assertEq(amount, 1500000000000000000, "Incorrect vested tokens");
     }
 }
