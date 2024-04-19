@@ -14,7 +14,8 @@ import "../access/Governable.sol";
 //Interfaces
 import "./interfaces/ILogxStaker.sol";
 
-contract LogxStaker is ReentrancyGuard, Governable {
+//ToDo - LogxStaker contract should implement ERC20 interface, which blocked allowance approve and transfer
+contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
 
     //Constants
@@ -52,7 +53,6 @@ contract LogxStaker is ReentrancyGuard, Governable {
 
     //Events
     event Claim(address receiver, address tokenAddress, uint256 amount);
-    event Transfer(address indexed from, address indexed to, uint256 value);
 
     //Structs
     struct Stake {
@@ -106,6 +106,23 @@ contract LogxStaker is ReentrancyGuard, Governable {
         isHandler[_handler] = _isActive;
     }
 
+    //ERC20 contract functions which are not supported 
+    function transfer(address recipient, uint256 amount) external returns (bool) {
+        revert("Transfer of staked $LOGX not allowed");
+    }
+
+    function allowance(address owner, address spender) external view returns (uint256) {
+        revert("Allowance for staked $LOGX not allowed");
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        revert("Approvals for staked $LOGX not allowed");
+    }
+
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool) {
+        revert("Transfer From staked $LOGX not allowed");
+    }
+
     /**
         @dev
         @param duration to be passed as number of days
@@ -135,11 +152,6 @@ contract LogxStaker is ReentrancyGuard, Governable {
 
     function getUserIds(address _user) public view returns (bytes32[] memory) {
         return userIds[_user];
-    }
-
-    function getStake(bytes32 stakeId) public view returns (Stake memory) {
-        require(stakes[stakeId].startTime != 0, "Stake does not exist.");
-        return stakes[stakeId];
     }
 
     /**

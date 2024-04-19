@@ -362,8 +362,8 @@ contract logxStakerTest is Test {
         assertEq(balanceBefore, balanceAfter, "Incorrect balances");
         assertEq(totalSupplyBefore, totalSupplyAfter, "Incorrect total supply");
 
-        LogxStaker.Stake memory stake = logxStaker.getStake(stakeId);
-        assertEq(stake.duration, 15, "Incorrect stake duration");
+        (, , uint256 duration, , ) = logxStaker.stakes(stakeId);
+        assertEq(duration, 15, "Incorrect stake duration");
     }
 
     function testRestakeForAccount() public {
@@ -401,8 +401,8 @@ contract logxStakerTest is Test {
         assertEq(balanceBefore, balanceAfter, "Incorrect balances");
         assertEq(totalSupplyBefore, totalSupplyAfter, "Incorrect total supply");
 
-        LogxStaker.Stake memory stake = logxStaker.getStake(stakeId);
-        assertEq(stake.duration, 15, "Incorrect stake duration");
+        (, , uint256 duration, , ) = logxStaker.stakes(stakeId);
+        assertEq(duration, 15, "Incorrect stake duration");
     }
 
     function testZeroDurationStake() public {
