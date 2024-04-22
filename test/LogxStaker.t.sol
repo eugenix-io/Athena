@@ -502,4 +502,24 @@ contract logxStakerTest is Test {
 
         assertEq(amount, 1500000000000000000, "Incorrect vested tokens");
     }
+
+    function testTransferRevert() public {
+        vm.expectRevert("Transfer of staked $LOGX not allowed");
+        logxStaker.transfer(address(0x1), 100);
+    }
+
+    function testAllowanceRevert() public {
+        vm.expectRevert("Allowance for staked $LOGX not allowed");
+        logxStaker.allowance(address(this), address(0x1));
+    }
+
+    function testApproveRevert() public {
+        vm.expectRevert("Approvals for staked $LOGX not allowed");
+        logxStaker.approve(address(0x1), 100);
+    }
+
+    function testTransferFromRevert() public {
+        vm.expectRevert("Transfer From staked $LOGX not allowed");
+        logxStaker.transferFrom(address(this), address(0x1), 100);
+    }
 }

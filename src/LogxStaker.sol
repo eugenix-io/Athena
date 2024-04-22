@@ -14,7 +14,6 @@ import "../access/Governable.sol";
 //Interfaces
 import "./interfaces/ILogxStaker.sol";
 
-//ToDo - LogxStaker contract should implement ERC20 interface, which blocked allowance approve and transfer
 contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
 
@@ -106,7 +105,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
         isHandler[_handler] = _isActive;
     }
 
-    //ERC20 contract functions which are not supported 
+    //ERC20 contract functions which are not supported on staked $LOGX token
     function transfer(address recipient, uint256 amount) external returns (bool) {
         revert("Transfer of staked $LOGX not allowed");
     }
