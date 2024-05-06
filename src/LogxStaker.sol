@@ -3,7 +3,7 @@
 pragma solidity ^0.8.19;
 
 /**
-    @title RewardTracker
+    @title LogxStaker
  */
 
 import "../libraries/token/IERC20.sol";
@@ -106,6 +106,8 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
     }
 
     //ERC20 contract functions which are not supported on staked $LOGX token
+    //ToDo - we have to figure out if wallets will show st$LOGX as an ERC20 contract even if 
+    //  LogxStaker is an abstract contract without the following functions - transfer, allowance, approve, transferFrom
     function transfer(address recipient, uint256 amount) external returns (bool) {
         revert("Transfer of staked $LOGX not allowed");
     }
