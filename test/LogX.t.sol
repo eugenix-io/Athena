@@ -188,5 +188,37 @@ contract LogXTest is Test {
 
         assertEq(charlieBalanceAfterMint, 100 * 10 ** 18, "Charlie's balance after mint should be 0");
         assertEq(charlieBalanceAfterBurn, 50 * 10 ** 18, "Charlie's balance after burn should be 0");
+        vm.stopPrank();
+    }
+
+    function testMintWithoutMinterAddress() public {
+        vm.expectRevert("LogX: forbidden");
+        logX.mint(charlie, 100 * 10 ** 18);
+    }
+
+    function testMintToZeroAddress() public {
+        logX.setMinter(minter, true);
+        assertTrue(logX.isMinter(minter));
+
+        vm.startPrank(minter);
+        vm.expectRevert("LogX: mint to the zero address");
+        logX.mint(address(0), 100 * 10 ** 18);
+        vm.stopPrank();
+
+    }
+
+    function testBurnWithoutMinterAddress() public {
+        vm.expectRevert("LogX: forbidden");
+        logX.burn(charlie, 100 * 10 ** 18);
+    }
+
+    function testBurnToZeroAddress() public {
+        logX.setMinter(minter, true);
+        assertTrue(logX.isMinter(minter));
+
+        vm.startPrank(minter);
+        vm.expectRevert("LogX: burn from the zero address");
+        logX.burn(address(0), 100 * 10 ** 18);
+        vm.stopPrank();
     }
 }

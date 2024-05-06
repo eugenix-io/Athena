@@ -33,7 +33,7 @@ contract LogX is IERC20, ILogX {
     }
 
     modifier onlyMinter() {
-        require(isMinter[msg.sender], "MintableBaseToken: forbidden");
+        require(isMinter[msg.sender], "LogX: forbidden");
         _;
     }
 
