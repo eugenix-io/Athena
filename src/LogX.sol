@@ -18,7 +18,6 @@ contract LogX is IERC20, ILogX {
     uint8 public constant decimals = 18;
 
     //ToDo - add a limit of 1 billion tokens on total supply
-    //Question - If $LOGX is being used as gas token, how will the burn mechanism work on LogX network ? 
     uint256 public override totalSupply;
     
     address public gov;
