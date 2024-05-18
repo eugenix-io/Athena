@@ -27,7 +27,6 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
     //Global Variables
     string public name;
     string public symbol;
-    address public depositToken;
     bool public isInitialized;
     bool public inPrivateTransferMode;
     bool public inPrivateStakingMode;
@@ -51,7 +50,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
     mapping(bytes32 => uint256) private lastRewardsTime;
 
     //Events
-    event Claim(address receiver, address tokenAddress, uint256 amount);
+    event Claim(address receiver, uint256 amount);
 
     //Structs
     struct Stake {
@@ -71,13 +70,9 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
         symbol = _symbol;
     }
 
-    function initialize(
-        address _depositToken
-    ) external onlyGov {
+    function initialize() external onlyGov {
         require(!isInitialized, "LogxStaker: already initialized");
         isInitialized = true;
-
-        depositToken = _depositToken;
 
         //Initialising $LOGX vesting APRs with pre-defined values
         // We add APR values considering the BASIS_POINTS_DIVISOR which is 10^4.
@@ -164,29 +159,26 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
         @param _amount will be the amount of $LOGX to be staked (denominated in 10 ^ 18)
         @param _duration will be the duration for which _amount will be staked in DAYS
      */
-    function stake(address _depositToken, uint256 _amount, uint256 _duration) external nonReentrant {
+    function stake( uint256 _amount, uint256 _duration) payable external nonReentrant {
         if(inPrivateStakingMode) { revert("LogxStaker: staking action not enabled"); }
-        _stake(msg.sender, msg.sender, _depositToken, _amount, _duration);
+        _stake(msg.sender, msg.sender, _amount, _duration);
     }
 
     /**
         @dev
         @param _fundingAccount will be the address of the account sponsoring $LOGX tokens
         @param _account will be the address of the account for which _fundingAccount is sponsoring $LOGX tokens
-        @param _depositToken will be the address of $LOGX token
         @param _amount will be the amount of $LOGX to be staked (denominated in 10 ^ 18)
         @param _duration will be the duration for which _amount will be staked in DAYS
      */
-    function stakeForAccount(address _fundingAccount, address _account, address _depositToken, uint256 _amount, uint256 _duration) external nonReentrant {
+    function stakeForAccount(address _fundingAccount, address _account, uint256 _amount, uint256 _duration) payable external nonReentrant {
         _validateHandler();
-        _stake(_fundingAccount, _account, _depositToken, _amount, _duration);
+        _stake(_fundingAccount, _account, _amount, _duration);
     }
 
-    function _stake(address _fundingAccount, address _account, address _depositToken, uint256 _amount, uint256 _duration) private {
+    function _stake(address _fundingAccount, address _account, uint256 _amount, uint256 _duration) private {
         require(_amount > 0, "Reward Tracker: invalid amount");
-        require(_depositToken == depositToken, "LogxStaker: invalid _depositToken");
-
-        IERC20(_depositToken).safeTransferFrom(_fundingAccount, address(this), _amount);
+        require(msg.value == _amount, "LogxStaker: msg.value != amount");
 
         stakedAmounts[_account] = stakedAmounts[_account] + _amount;
         totalDepositSupply = totalDepositSupply + _amount;
@@ -214,28 +206,26 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
         @param _deposiToken will be the address of $LOGX token
         @param _stakeId is the ID of the stake which has to be unstaked
      */
-    function unstake(address _depositToken, bytes32 _stakeId) external nonReentrant {
+    function unstake(bytes32 _stakeId) external nonReentrant returns(uint256){
         if(inPrivateStakingMode) { revert("LogxStaker: action not enabled"); }
         require(!isStakeActive(_stakeId), "LogxStaker: staking duration active");
-        _unstake(msg.sender, _depositToken, msg.sender, _stakeId);
+        return _unstake(msg.sender, msg.sender, _stakeId);
     }
 
     /**
         @dev
         @param _account will be the address of the account for which _fundingAccount is sponsoring $LOGX tokens
-        @param _depositToken will be the address of $LOGX token
-        @param _receiver will be the address which will receive _depositTokens
+        @param _receiver will be the address which will receive LogX tokens
         @param _stakeId is the ID of the stake which has to be unstaked
      */
-    function unstakeForAccount(address _account, address _depositToken, address _receiver, bytes32 _stakeId) external nonReentrant {
+    function unstakeForAccount(address _account, address _receiver, bytes32 _stakeId) external nonReentrant returns(uint256){
         _validateHandler();
-        _unstake(_account, _depositToken, _receiver, _stakeId);
+        return _unstake(_account, _receiver, _stakeId);
     }
 
-    function _unstake(address _account, address _depositToken, address _receiver, bytes32 stakeId) private {
+    function _unstake(address _account, address _receiver, bytes32 stakeId) private returns(uint256) {
         address accountForStakeId = getAccountForStakeId(stakeId);
         require(accountForStakeId == _account, "LogxStaker: invalid _stakeId for _account");
-        require(_depositToken == depositToken, "LogxStaker: invalid _depositToken");
 
         _updateRewards(_account, stakeId);
 
@@ -248,7 +238,9 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
         //Note - the staked LogX tokens are minted to funding account and not the user.
         _burn(_receiver, amount);
 
-        IERC20(_depositToken).safeTransfer(_receiver, amount);
+        (bool success,) = payable(_receiver).call{value: amount}("");
+        require(success, "LogX unstaked");
+        return amount;
     }
 
     function _burn(address _account, uint256 _amount) internal {
@@ -264,20 +256,19 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
     /**
         Re-staking User Flow
      */
-    function restake(address _depositToken, bytes32 _stakeId, uint256 _duration) external nonReentrant {
+    function restake(bytes32 _stakeId, uint256 _duration) external nonReentrant {
         if(inPrivateStakingMode) { revert("LogxStaker: action not enabled"); }
-        _restake(msg.sender, _depositToken, _stakeId, _duration);
+        _restake(msg.sender, _stakeId, _duration);
     }
 
-    function restakeForAccount(address _account, address _depositToken, bytes32 _stakeId, uint256 _duration) external nonReentrant {
+    function restakeForAccount(address _account, bytes32 _stakeId, uint256 _duration) external nonReentrant {
         _validateHandler();
-        _restake(_account, _depositToken, _stakeId, _duration);
+        _restake(_account, _stakeId, _duration);
     }
 
-    function _restake(address _account, address _depositToken, bytes32 _stakeId, uint256 _duration) private {
+    function _restake(address _account, bytes32 _stakeId, uint256 _duration) private {
         address accountForStakeId = getAccountForStakeId(_stakeId);
         require(accountForStakeId == _account, "LogxStaker: invalid _stakeId for _account");
-        require(_depositToken == depositToken, "LogxStaker: invalid _depositToken");
         require(!isStakeActive(_stakeId), "LogxStaker: staking duration active");
 
         _updateRewards(_account, _stakeId);
@@ -305,8 +296,9 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
         uint256 amount = claimableTokens[_account];
         claimableTokens[_account] = 0;
 
-        IERC20(depositToken).safeTransfer(_receiver, amount);
-        emit Claim(_account, depositToken, amount);
+        (bool success,) = payable(_receiver).call{value: amount}("");
+        require(success, "LogX claimed");
+        emit Claim(_account, amount);
         return amount;
     }
 
