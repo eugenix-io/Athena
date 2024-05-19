@@ -364,7 +364,8 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
             startTime: startTime
         });
         userIds[_account].push(stakeId);
-    }
+        lastRewardsTime[stakeId] = block.timestamp;
+    }   
 
     //Note - think of ways to make this function more gas efficient
     function _removeStake(address _account, bytes32 _stakeId) private {
