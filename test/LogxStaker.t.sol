@@ -19,7 +19,6 @@ contract DepositToken is ERC20 {
 
 contract logxStakerTest is Test {
     LogxStaker logxStaker;
-    DepositToken depositToken;
     ERC20Token erc20;
     //Testing accounts
     address accountA;
@@ -31,15 +30,14 @@ contract logxStakerTest is Test {
         accountA = address(1001);
         accountB = address(1002);
         erc20 = new ERC20Token(1e24);
-        depositToken = new DepositToken(1e24);
         logxStaker = new LogxStaker('LogX Token', 'LOGX');
         //Vesting and deposit token are the same ($LOGX token)
-        logxStaker.initialize(address(depositToken));
+        logxStaker.initialize();
 
         //Transfer 100 depositTokens to accountA, accountB and logxStaker (*10^18)
-        depositToken.transfer(accountB, 150000000000000000000);
-        depositToken.transfer(accountA, 365000000000000000000);
-        depositToken.transfer(address(logxStaker), 100000000000000000000);
+        vm.deal(accountB, 150 ether);
+        vm.deal(accountA, 365 ether);
+        vm.deal(address(logxStaker), 100 ether);
     }
 
     function testSetInPrivateTransferMode() public {
@@ -122,8 +120,7 @@ contract logxStakerTest is Test {
 
 
         vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 50000000000000000000);
-        logxStaker.stake(address(depositToken), 50000000000000000000, 10);
+        logxStaker.stake{value: 50 ether}(50000000000000000000, 10);
         vm.stopPrank();
 
         uint256 stakedAmountAfter = logxStaker.stakedAmounts(address(accountA));
@@ -147,8 +144,7 @@ contract logxStakerTest is Test {
     function testUnstake() public {
         //Using Account 'A' to Stake
         vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 50000000000000000000);
-        logxStaker.stake(address(depositToken), 50000000000000000000, 7);
+        logxStaker.stake{value: 50 ether}(50000000000000000000, 7);
         vm.stopPrank();
 
         bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
@@ -162,7 +158,7 @@ contract logxStakerTest is Test {
         //Simulate passage of time so staking duration ends
         vm.warp(8 days);
         vm.startPrank(accountA);
-        logxStaker.unstake(address(depositToken), stakeId);
+        logxStaker.unstake(stakeId);
         vm.stopPrank();
 
         uint256 stakedAmountAfter = logxStaker.stakedAmounts(address(accountA));
@@ -177,8 +173,8 @@ contract logxStakerTest is Test {
     }
 
     function testStakeForAccount() public {
-        vm.prank(gov);
         address handlerMock = address(150);
+        vm.prank(gov);
         logxStaker.setHandler(handlerMock, true);
 
         //Using Account 'B' to stake for Account 'A'
@@ -187,11 +183,9 @@ contract logxStakerTest is Test {
         uint256 balanceBefore = logxStaker.balanceOf(address(accountA));
         uint256 totalSupplyBefore = logxStaker.totalSupply();
 
-
-        vm.prank(accountA);
-        depositToken.approve(address(logxStaker), 50000000000000000000);
+        vm.deal(address(150), 100 ether);
         vm.prank(address(150));
-        logxStaker.stakeForAccount(accountA, accountA, address(depositToken), 50000000000000000000, 10);
+        logxStaker.stakeForAccount{value: 50 ether}(accountA, accountA, 50000000000000000000, 10);
 
         uint256 stakedAmountAfter = logxStaker.stakedAmounts(address(accountA));
         uint256 totalDepositSupplyAfter = logxStaker.totalDepositSupply();
@@ -218,8 +212,7 @@ contract logxStakerTest is Test {
 
         //Using Account 'A' to Stake
         vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 50000000000000000000);
-        logxStaker.stake(address(depositToken), 50000000000000000000, 7);
+        logxStaker.stake{value: 50 ether}(50000000000000000000, 7);
         vm.stopPrank();
 
         bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
@@ -233,7 +226,7 @@ contract logxStakerTest is Test {
         //Simulate passage of time so staking duration ends
         vm.warp(8 days);
         vm.prank(address(150));
-        logxStaker.unstakeForAccount(accountA, address(depositToken), accountA, stakeId);
+        logxStaker.unstakeForAccount(accountA, accountA, stakeId);
 
 
         uint256 stakedAmountAfter = logxStaker.stakedAmounts(address(accountA));
@@ -250,8 +243,7 @@ contract logxStakerTest is Test {
     function testUnstakeBeforeDurationEnd() public {
         //Using Account 'A' to Stake
         vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 50000000000000000000);
-        logxStaker.stake(address(depositToken), 50000000000000000000, 7);
+        logxStaker.stake{value: 50 ether}(50000000000000000000, 7);
         vm.stopPrank();
 
         bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
@@ -259,15 +251,14 @@ contract logxStakerTest is Test {
 
         vm.startPrank(accountA);
         vm.expectRevert("LogxStaker: staking duration active");
-        logxStaker.unstake(address(depositToken), stakeId);
+        logxStaker.unstake(stakeId);
         vm.stopPrank();
     }
 
     function testUnstakingWithWrongAccount() public {
         //Using Account 'A' to Stake
         vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 50000000000000000000);
-        logxStaker.stake(address(depositToken), 50000000000000000000, 7);
+        logxStaker.stake{value: 50 ether}(50000000000000000000, 7);
         vm.stopPrank();
 
         bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
@@ -277,7 +268,7 @@ contract logxStakerTest is Test {
 
         vm.startPrank(accountB);
         vm.expectRevert("LogxStaker: invalid _stakeId for _account");
-        logxStaker.unstake(address(depositToken), stakeId);
+        logxStaker.unstake(stakeId);
         vm.stopPrank();
     }
 
@@ -286,8 +277,7 @@ contract logxStakerTest is Test {
         // 91.25 tokens for 30 days at 20% APR, earning 1.5 tokens at the end of vesting period
         //Using Account 'A' to Stake
         vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 91250000000000000000);
-        logxStaker.stake(address(depositToken), 91250000000000000000, 30);
+        logxStaker.stake{value: 91.25 ether}(91250000000000000000, 30);
         vm.stopPrank();
 
         bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
@@ -296,7 +286,7 @@ contract logxStakerTest is Test {
         //Simulate passage of time so staking duration ends
         vm.warp(31 days);
         vm.startPrank(accountA);
-        logxStaker.unstake(address(depositToken), stakeId);
+        logxStaker.unstake(stakeId);
         uint256 amount = logxStaker.claimTokens();
         vm.stopPrank();
 
@@ -312,8 +302,7 @@ contract logxStakerTest is Test {
         // 91.25 tokens for 30 days at 20% APR, earning 1.5 tokens at the end of vesting period
         //Using Account 'A' to Stake
         vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 91250000000000000000);
-        logxStaker.stake(address(depositToken), 91250000000000000000, 30);
+        logxStaker.stake{value: 91.25 ether}(91250000000000000000, 30);
         vm.stopPrank();
 
         bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
@@ -322,7 +311,7 @@ contract logxStakerTest is Test {
         //Simulate passage of time so staking duration ends
         vm.warp(31 days);
         vm.startPrank(accountA);
-        logxStaker.unstake(address(depositToken), stakeId);
+        logxStaker.unstake(stakeId);
         vm.stopPrank();
 
         vm.prank(address(150));
@@ -334,8 +323,7 @@ contract logxStakerTest is Test {
     function testRestake() public {
         //Normal staking
         vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 50000000000000000000);
-        logxStaker.stake(address(depositToken), 50000000000000000000, 10);
+        logxStaker.stake{value: 50 ether}(50000000000000000000, 10);
         vm.stopPrank();
 
         bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
@@ -349,7 +337,7 @@ contract logxStakerTest is Test {
         uint256 totalSupplyBefore = logxStaker.totalSupply();
 
         vm.startPrank(accountA);
-        logxStaker.restake(address(depositToken), stakeId, 15);
+        logxStaker.restake(stakeId, 15);
         vm.stopPrank();
 
         uint256 stakedAmountAfter = logxStaker.stakedAmounts(address(accountA));
@@ -373,8 +361,7 @@ contract logxStakerTest is Test {
 
         //Normal staking
         vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 50000000000000000000);
-        logxStaker.stake(address(depositToken), 50000000000000000000, 10);
+        logxStaker.stake{value: 50 ether}(50000000000000000000, 10);
         vm.stopPrank();
 
         bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
@@ -388,7 +375,7 @@ contract logxStakerTest is Test {
         uint256 totalSupplyBefore = logxStaker.totalSupply();
 
         vm.startPrank(address(150));
-        logxStaker.restakeForAccount(address(accountA), address(depositToken), stakeId, 15);
+        logxStaker.restakeForAccount(address(accountA), stakeId, 15);
         vm.stopPrank();
 
         uint256 stakedAmountAfter = logxStaker.stakedAmounts(address(accountA));
@@ -410,17 +397,16 @@ contract logxStakerTest is Test {
         // 100 tokens staked with 0 duration for 365 days at 3% APR, earning 3 tokens at the end of vesting period
         //Using Account 'A' to Stake
         vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 100000000000000000000);
-        logxStaker.stake(address(depositToken), 100000000000000000000, 0);
+        logxStaker.stake{value: 100 ether}(100000000000000000000, 0);
         vm.stopPrank();
 
         bytes32[] memory stakeIds = logxStaker.getUserIds(accountA);
         bytes32 stakeId = stakeIds[0];
         
         //Simulate passage of time so staking duration ends
-        vm.warp(365 days);
+        vm.warp(365 days + 1 seconds);
         vm.startPrank(accountA);
-        logxStaker.unstake(address(depositToken), stakeId);
+        logxStaker.unstake(stakeId);
         uint256 amount = logxStaker.claimTokens();
         vm.stopPrank();
 
@@ -431,12 +417,11 @@ contract logxStakerTest is Test {
         //Staking 86400 tokens for 30 days at 20% APR
         //at the end of day 1, user should earn 0.2 tokens
         vm.startPrank(accountA);
-        depositToken.approve(address(logxStaker), 365000000000000000000);
-        logxStaker.stake(address(depositToken), 365000000000000000000, 30);
+        logxStaker.stake{value: 365 ether}(365000000000000000000, 30);
         vm.stopPrank();
         
         //Simulate passage of 2 days
-        vm.warp(2 days);
+        vm.warp(2 days + 1 seconds);
         vm.startPrank(accountA);
         uint256 amount1 = logxStaker.claimTokens();
         vm.stopPrank();
@@ -445,7 +430,7 @@ contract logxStakerTest is Test {
 
         //Simulate passage of another 2 days
         //Note looks like vm.warp does not stack on the previous vm.warp, hence we have to simulate the passage of 4 days
-        vm.warp(4 days);
+        vm.warp(4 days + 1 seconds);
         vm.startPrank(accountA);
         uint256 amount2 = logxStaker.claimTokens();
         vm.stopPrank();
@@ -461,9 +446,10 @@ contract logxStakerTest is Test {
         //Using Account 'A' to Stake
         vm.startPrank(accountA);
         uint256 singleStakeAmount = 91250000000000000000 / stakeCount;
+
+        uint256 singleStakeAmountEther = 1.825 ether;
         for (uint256 i=0; i< stakeCount; i++) {
-            depositToken.approve(address(logxStaker), singleStakeAmount);
-            logxStaker.stake(address(depositToken), singleStakeAmount, 30);
+            logxStaker.stake{value: singleStakeAmountEther}(singleStakeAmount, 30);
         }
         vm.stopPrank();
 
@@ -484,9 +470,9 @@ contract logxStakerTest is Test {
         //Using Account 'A' to Stake
         vm.startPrank(accountA);
         uint256 singleStakeAmount = 91250000000000000000 / stakeCount;
+        uint256 singleStakeAmountEther = 1.825 ether;
         for (uint256 i=0; i< stakeCount; i++) {
-            depositToken.approve(address(logxStaker), singleStakeAmount);
-            logxStaker.stake(address(depositToken), singleStakeAmount, 30);
+            logxStaker.stake{value: singleStakeAmountEther}(singleStakeAmount, 30);
         }
         vm.stopPrank();
 
@@ -495,7 +481,7 @@ contract logxStakerTest is Test {
         vm.warp(31 days);
         vm.startPrank(accountA);
         for (uint256 i=0; i< stakeIds.length; i++) {
-            logxStaker.unstake(address(depositToken), stakeIds[i]);
+            logxStaker.unstake(stakeIds[i]);
         }
         uint256 amount = logxStaker.claimTokens();
         vm.stopPrank();

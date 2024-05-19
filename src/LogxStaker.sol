@@ -393,13 +393,15 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
         stakes[_stakeId].duration = _duration;
         stakes[_stakeId].apy = apy;
         stakes[_stakeId].startTime = startTime;
+
+        lastRewardsTime[_stakeId] = block.timestamp;
     }
 
     //Note - following is the most important function in the contract.
     function _updateRewards(address _account, bytes32 stakeId) private {
         Stake memory userStake = stakes[stakeId];
         
-        uint256 stakeDurationEndTimestamp = userStake.startTime + (userStake.duration * 1 days) - 1;
+        uint256 stakeDurationEndTimestamp = userStake.startTime + (userStake.duration * 1 days);
         uint256 lastRewardDistributionTime = lastRewardsTime[stakeId];
         lastRewardsTime[stakeId] = block.timestamp;
 
