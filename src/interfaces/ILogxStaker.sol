@@ -5,7 +5,7 @@ interface ILogxStaker {
     // Function declarations from LogxStaker contract
 
     // Initialization and configuration
-    function initialize(address _depositToken) external;
+    function initialize() external;
     function setInPrivateTransferMode(bool _inPrivateTransferMode) external;
     function setInPrivateStakingMode(bool _inPrivateStakingMode) external;
     function setInPrivateClaimingMode(bool _inPrivateClaimingMode) external;
@@ -14,12 +14,12 @@ interface ILogxStaker {
     function withdrawToken(address _token, address _account, uint256 _amount) external;
 
     // Token balance and staking
-    function stake(address _depositToken, uint256 _amount, uint256 _duration) external;
-    function stakeForAccount(address _fundingAccount, address _account, address _depositToken, uint256 _amount, uint256 _duration) external;
-    function unstake(address _depositToken, bytes32 _stakeId) external;
-    function unstakeForAccount(address _account, address _depositToken, address _receiver, bytes32 _stakeId) external;
-    function restake(address _depositToken, bytes32 _stakeId, uint256 _duration) external;
-    function restakeForAccount(address _account, address _depositToken, bytes32 _stakeId, uint256 _duration) external;
+    function stake(uint256 _amount, uint256 _duration) payable external;
+    function stakeForAccount(address _fundingAccount, address _account, uint256 _amount, uint256 _duration) payable external;
+    function unstake(bytes32 _stakeId) external returns(uint256);
+    function unstakeForAccount(address _account, address _receiver, bytes32 _stakeId) external returns(uint256);
+    function restake(bytes32 _stakeId, uint256 _duration) external;
+    function restakeForAccount(address _account, bytes32 _stakeId, uint256 _duration) external;
 
     // Token claiming
     function claimTokens() external returns (uint256);
