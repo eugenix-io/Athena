@@ -208,7 +208,6 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
      */
     function unstake(bytes32 _stakeId) external nonReentrant returns(uint256){
         if(inPrivateStakingMode) { revert("LogxStaker: action not enabled"); }
-        require(!isStakeActive(_stakeId), "LogxStaker: staking duration active");
         return _unstake(msg.sender, msg.sender, _stakeId);
     }
 
@@ -224,6 +223,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
     }
 
     function _unstake(address _account, address _receiver, bytes32 stakeId) private returns(uint256) {
+        require(!isStakeActive(stakeId), "LogxStaker: staking duration active");
         address accountForStakeId = getAccountForStakeId(stakeId);
         require(accountForStakeId == _account, "LogxStaker: invalid _stakeId for _account");
 
