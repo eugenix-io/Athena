@@ -158,6 +158,7 @@ contract logxStakerTest is Test {
         //Simulate passage of time so staking duration ends
         vm.warp(8 days);
         vm.startPrank(accountA);
+        uint256 accruedStakeIdRewards = logxStaker.getStakeIdRewards(stakeId);
         logxStaker.unstake(stakeId);
         vm.stopPrank();
 
@@ -170,6 +171,8 @@ contract logxStakerTest is Test {
         assertEq(totalDepositSupplyBefore - totalDepositSupplyAfter, 50000000000000000000);
         assertEq(balanceBefore - balanceAfter, 50000000000000000000);
         assertEq(totalSupplyBefore - totalSupplyAfter, 50000000000000000000);
+
+        assertEq(accruedStakeIdRewards, 95890410958904109);
     }
 
     function testStakeForAccount() public {
@@ -286,11 +289,13 @@ contract logxStakerTest is Test {
         //Simulate passage of time so staking duration ends
         vm.warp(31 days);
         vm.startPrank(accountA);
+        uint256 accruedAmount = logxStaker.getUserRewards(address(accountA));
         logxStaker.unstake(stakeId);
         uint256 amount = logxStaker.claimTokens();
         vm.stopPrank();
 
         assertEq(amount, 1500000000000000000, "Incorrect vested tokens");
+        assertEq(accruedAmount, 1500000000000000000, "Incorrect vested tokens");
     }
 
     function testClaimTokensForAccount() public {

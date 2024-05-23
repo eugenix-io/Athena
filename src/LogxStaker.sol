@@ -151,6 +151,35 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
     }
 
     /**
+        Utility functions to get eligible rewards
+     */
+    function _getAccruedRewards(bytes32 stakeId) internal view returns (uint256) {
+        Stake memory userStake = stakes[stakeId];
+
+        uint256 stakeDurationEndTimestamp = userStake.startTime + (userStake.duration * 1 days);
+        uint256 stakeDurationStartTimestamp = userStake.startTime;
+
+        uint256 duration = block.timestamp >= stakeDurationEndTimestamp ? (userStake.duration * 1 days) : block.timestamp - stakeDurationStartTimestamp;
+
+        // Calculate reward tokens
+        uint256 rewardTokens = (userStake.amount * userStake.apy * duration) / (YEAR_IN_SECONDS * 100 * BASIS_POINTS_DIVISOR);
+        return rewardTokens;
+    }
+
+    function getUserRewards(address _account) external view returns (uint256) {
+        bytes32[] memory userStakeIds = userIds[_account];
+        uint256 accruedRewards;
+        for(uint256 i=0; i < userStakeIds.length; i++) {
+            accruedRewards = accruedRewards + _getAccruedRewards(userStakeIds[i]);
+        }
+        return accruedRewards;
+    }
+
+    function getStakeIdRewards(bytes32 stakeId) external view returns (uint256) {
+        return _getAccruedRewards(stakeId);
+    }
+
+    /**
         Staking User Flow
      */
     /**
@@ -159,7 +188,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
         @param _amount will be the amount of $LOGX to be staked (denominated in 10 ^ 18)
         @param _duration will be the duration for which _amount will be staked in DAYS
      */
-    function stake( uint256 _amount, uint256 _duration) payable external nonReentrant {
+    function stake(uint256 _amount, uint256 _duration) payable external nonReentrant {
         if(inPrivateStakingMode) { revert("LogxStaker: staking action not enabled"); }
         _stake(msg.sender, msg.sender, _amount, _duration);
     }
