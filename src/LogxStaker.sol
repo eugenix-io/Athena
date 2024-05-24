@@ -166,13 +166,23 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
         return rewardTokens;
     }
 
-    function getUserRewards(address _account) external view returns (uint256) {
+    function getUnclaimedUserRewards(address _account) external view returns (uint256) {
         bytes32[] memory userStakeIds = userIds[_account];
         uint256 accruedRewards;
         for(uint256 i=0; i < userStakeIds.length; i++) {
-            accruedRewards = accruedRewards + _getAccruedRewards(userStakeIds[i]);
+            accruedRewards = accruedRewards + _getUnclaimedRewards(userStakeIds[i]);
         }
         return accruedRewards;
+    }
+
+    function _getUnclaimedRewards(bytes32 stakeId) internal view returns(uint256) {
+        Stake memory userStake = stakes[stakeId];
+        uint256 stakeDurationEndTimestamp = userStake.startTime + (userStake.duration * 1 days);
+        uint256 endTimeStamp = block.timestamp > stakeDurationEndTimestamp ? stakeDurationEndTimestamp : block.timestamp;
+
+        uint duration = endTimeStamp - lastRewardsTime[stakeId];
+        uint256 rewardTokens = (userStake.amount * userStake.apy * duration) / (YEAR_IN_SECONDS * 100 * BASIS_POINTS_DIVISOR);
+        return rewardTokens;
     }
 
     function getStakeIdRewards(bytes32 stakeId) external view returns (uint256) {
