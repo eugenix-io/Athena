@@ -5,7 +5,6 @@ interface ILogxStaker {
     // Function declarations from LogxStaker contract
 
     // Initialization and configuration
-    function initialize() external;
     function setInPrivateTransferMode(bool _inPrivateTransferMode) external;
     function setInPrivateStakingMode(bool _inPrivateStakingMode) external;
     function setInPrivateClaimingMode(bool _inPrivateClaimingMode) external;

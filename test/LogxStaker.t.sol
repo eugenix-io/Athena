@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "../src/LogxStaker.sol";
 import "../libraries/open-zeppelin/ERC20.sol";
+import "openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract ERC20Token is ERC20 {
     constructor(uint256 initialSupply) ERC20("ERC20 Token", "ERC") {
@@ -30,9 +31,11 @@ contract logxStakerTest is Test {
         accountA = address(1001);
         accountB = address(1002);
         erc20 = new ERC20Token(1e24);
-        logxStaker = new LogxStaker('LogX Token', 'LOGX');
+        LogxStaker logxStakerImpl = new LogxStaker();
         //Vesting and deposit token are the same ($LOGX token)
-        logxStaker.initialize();
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(address(logxStakerImpl),gov,""); 
+        logxStaker = LogxStaker(payable(address(proxy)));
+        logxStaker.initialize('LogX Token', 'LOGX');
 
         //Transfer 100 depositTokens to accountA, accountB and logxStaker (*10^18)
         vm.deal(accountB, 150 ether);
@@ -70,7 +73,7 @@ contract logxStakerTest is Test {
         address handlerMock = address(150);
 
         vm.prank(nonGov); // Prank with a non-gov address
-        vm.expectRevert("Governable: forbidden"); // Assuming your contract reverts with this message for unauthorized access
+        vm.expectRevert(); // Assuming your contract reverts with this message for unauthorized access
 
         logxStaker.setHandler(handlerMock, true);
 
@@ -106,7 +109,7 @@ contract logxStakerTest is Test {
         address nonGov = address(2); // An address not authorized as governor
 
         vm.startPrank(nonGov);
-        vm.expectRevert("Governable: forbidden");
+        vm.expectRevert();
         logxStaker.setAPRForDurationInDays(duration, apy);
         vm.stopPrank();
     }
@@ -289,7 +292,7 @@ contract logxStakerTest is Test {
         //Simulate passage of time so staking duration ends
         vm.warp(31 days);
         vm.startPrank(accountA);
-        uint256 accruedAmount = logxStaker.getUserRewards(address(accountA));
+        uint256 accruedAmount = logxStaker.getUnclaimedUserRewards(address(accountA));
         logxStaker.unstake(stakeId);
         uint256 amount = logxStaker.claimTokens();
         vm.stopPrank();

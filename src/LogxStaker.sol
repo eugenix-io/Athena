@@ -10,11 +10,12 @@ import "../libraries/token/IERC20.sol";
 import "../libraries/token/SafeERC20.sol";
 import "../libraries/utils/ReentrancyGuard.sol";
 import "../access/Governable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
 
 //Interfaces
 import "./interfaces/ILogxStaker.sol";
 
-contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
+contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable {
     using SafeERC20 for IERC20;
 
     //Constants
@@ -27,7 +28,6 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
     //Global Variables
     string public name;
     string public symbol;
-    bool public isInitialized;
     bool public inPrivateTransferMode;
     bool public inPrivateStakingMode;
     bool public inPrivateClaimingMode;
@@ -65,17 +65,16 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
         uint256 startTime;
     }
 
-    constructor(string memory _name, string memory _symbol) {
-        name = _name;
-        symbol = _symbol;
+    constructor() {
+        _disableInitializers();
     }
 
-    function initialize() external onlyGov {
-        require(!isInitialized, "LogxStaker: already initialized");
-        isInitialized = true;
-
+    function initialize(string calldata _name, string calldata _symbol) external initializer {
+        __Ownable_init(msg.sender);
         //Initialising $LOGX vesting APRs with pre-defined values
         // We add APR values considering the BASIS_POINTS_DIVISOR which is 10^4.
+        name = _name;
+        symbol = _symbol;
         apyForDuration[0] = 30000;
         apyForDuration[7] = 100000;
         apyForDuration[15] = 150000;
@@ -84,19 +83,19 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
         apyForDuration[90] = 300000;
     }
 
-    function setInPrivateTransferMode(bool _inPrivateTransferMode) external onlyGov {
+    function setInPrivateTransferMode(bool _inPrivateTransferMode) external onlyOwner {
         inPrivateTransferMode = _inPrivateTransferMode;
     }
 
-    function setInPrivateStakingMode(bool _inPrivateStakingMode) external onlyGov {
+    function setInPrivateStakingMode(bool _inPrivateStakingMode) external onlyOwner {
         inPrivateStakingMode = _inPrivateStakingMode;
     }
 
-    function setInPrivateClaimingMode(bool _inPrivateClaimingMode) external onlyGov {
+    function setInPrivateClaimingMode(bool _inPrivateClaimingMode) external onlyOwner {
         inPrivateClaimingMode = _inPrivateClaimingMode;
     }
 
-    function setHandler(address _handler, bool _isActive) external onlyGov {
+    function setHandler(address _handler, bool _isActive) external onlyOwner {
         isHandler[_handler] = _isActive;
     }
 
@@ -124,13 +123,13 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Governable {
         @param duration to be passed as number of days
         @param _apy to be passed considering (including) BASIS_POINTS_DIVISOR which is 10^4
      */
-    function setAPRForDurationInDays(uint256 _duration, uint256 _apy) external onlyGov {
+    function setAPRForDurationInDays(uint256 _duration, uint256 _apy) external onlyOwner {
         require(_apy > 0, "APR cannot be negative");
         apyForDuration[_duration] = _apy;
     }
 
     // to help users who accidentally send their tokens to this contract
-    function withdrawToken(address _token, address _account, uint256 _amount) external onlyGov {
+    function withdrawToken(address _token, address _account, uint256 _amount) external onlyOwner {
         IERC20(_token).safeTransfer(_account, _amount);
     }
 
