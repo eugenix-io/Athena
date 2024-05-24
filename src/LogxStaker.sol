@@ -177,9 +177,12 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     function _getUnclaimedRewards(bytes32 stakeId) internal view returns(uint256) {
         Stake memory userStake = stakes[stakeId];
         uint256 stakeDurationEndTimestamp = userStake.startTime + (userStake.duration * 1 days);
-        uint256 endTimeStamp = block.timestamp > stakeDurationEndTimestamp ? stakeDurationEndTimestamp : block.timestamp;
+        uint256 lastRewardDistributionTime = lastRewardsTime[stakeId];
 
-        uint duration = endTimeStamp - lastRewardsTime[stakeId];
+        uint256 duration = block.timestamp - lastRewardDistributionTime;
+        if(userStake.duration != 0 && block.timestamp >= stakeDurationEndTimestamp) {
+            duration = lastRewardDistributionTime >= stakeDurationEndTimestamp ? 0 : (stakeDurationEndTimestamp - lastRewardDistributionTime);
+        }
         uint256 rewardTokens = (userStake.amount * userStake.apy * duration) / (YEAR_IN_SECONDS * 100 * BASIS_POINTS_DIVISOR);
         return rewardTokens;
     }
