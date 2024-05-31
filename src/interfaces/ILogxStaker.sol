@@ -13,19 +13,19 @@ interface ILogxStaker {
     function withdrawToken(address _token, address _account, uint256 _amount) external;
 
     // Token balance and staking
-    function stake(uint256 _amount, uint256 _duration) payable external;
-    function stakeForAccount(address _fundingAccount, address _account, uint256 _amount, uint256 _duration) payable external;
-    function unstake(bytes32 _stakeId) external returns(uint256);
-    function unstakeForAccount(address _account, address _receiver, bytes32 _stakeId) external returns(uint256);
-    function restake(bytes32 _stakeId, uint256 _duration) external;
-    function restakeForAccount(address _account, bytes32 _stakeId, uint256 _duration) external;
+    function stake(bytes32 _account, uint256 _amount, uint256 _duration) payable external;
+    function stakeForAccount(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration) payable external;
+    function unstake(bytes32 _account, bytes32 _stakeId) external returns(uint256);
+    function unstakeForAccount(bytes32 _account, address _receiver, bytes32 _stakeId) external returns(uint256);
+    function restake(bytes32 account, bytes32 _stakeId, uint256 _duration) external;
+    function restakeForAccount(bytes32 _account, bytes32 _stakeId, uint256 _duration) external;
 
     // Token claiming
-    function claimTokens() external returns (uint256);
-    function claimTokensForAccount(address _account, address _receiver) external returns (uint256);
+    function claimTokens(bytes32 account) external returns (uint256);
+    function claimTokensForAccount(bytes32 _account, address _receiver) external returns (uint256);
 
     // View functions for stakes and user IDs
     function getAmountForStakeId(bytes32 stakeId) external view returns(uint256);
-    function getAccountForStakeId(bytes32 stakeId) external view returns(address);
-    function getUserIds(address _user) external view returns (bytes32[] memory);
+    function getAccountForStakeId(bytes32 stakeId) external view returns(bytes32);
+    function getUserIds(bytes32 _user) external view returns (bytes32[] memory);
 }
