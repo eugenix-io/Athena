@@ -38,23 +38,23 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     //Mappings
     mapping (address => bool) public isHandler;
     mapping (address => uint256) public balances;
-    mapping (address => uint256) public stakedAmounts;
-    mapping (address => bytes32[]) public userIds;
+    mapping (bytes32 => uint256) public stakedAmounts;
+    mapping (bytes32 => bytes32[]) public userIds;
     mapping (bytes32 => Stake) public stakes;
     //Note - the Apy values will be stored for duration in days
     mapping (uint256 => uint256) public apyForDuration;
-    mapping (address => uint256) public cumulativeTokens;
-    mapping (address => uint256) public claimableTokens;
+    mapping (bytes32 => uint256) public cumulativeTokens;
+    mapping (bytes32 => uint256) public claimableTokens;
     //ToDo - we could remove user nonce to save gas if needed
-    mapping(address => uint256) private userNonces;
+    mapping(bytes32 => uint256) private userNonces;
     mapping(bytes32 => uint256) private lastRewardsTime;
 
     //Events
-    event Claim(address receiver, uint256 amount);
+    event Claim(bytes32 receiver, uint256 amount);
 
     //Structs
     struct Stake {
-        address account;
+        bytes32 account;
         //Amount will be stored in 10^18 terms
         uint256 amount;
         //Duration will be stored in days
@@ -141,11 +141,11 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         return stakes[stakeId].amount;
     }
 
-    function getAccountForStakeId(bytes32 stakeId) public view returns(address) {
+    function getAccountForStakeId(bytes32 stakeId) public view returns(bytes32) {
         return stakes[stakeId].account;
     }
 
-    function getUserIds(address _user) public view returns (bytes32[] memory) {
+    function getUserIds(bytes32 _user) public view returns (bytes32[] memory) {
         return userIds[_user];
     }
 
@@ -165,7 +165,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         return rewardTokens;
     }
 
-    function getUnclaimedUserRewards(address _account) external view returns (uint256) {
+    function getUnclaimedUserRewards(bytes32 _account) external view returns (uint256) {
         bytes32[] memory userStakeIds = userIds[_account];
         uint256 accruedRewards;
         for(uint256 i=0; i < userStakeIds.length; i++) {
@@ -200,9 +200,9 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         @param _amount will be the amount of $LOGX to be staked (denominated in 10 ^ 18)
         @param _duration will be the duration for which _amount will be staked in DAYS
      */
-    function stake(uint256 _amount, uint256 _duration) payable external nonReentrant {
+    function stake(bytes32 _account, uint256 _amount, uint256 _duration) payable external nonReentrant {
         if(inPrivateStakingMode) { revert("LogxStaker: staking action not enabled"); }
-        _stake(msg.sender, msg.sender, _amount, _duration);
+        _stake(msg.sender, _account, _amount, _duration);
     }
 
     /**
@@ -212,12 +212,12 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         @param _amount will be the amount of $LOGX to be staked (denominated in 10 ^ 18)
         @param _duration will be the duration for which _amount will be staked in DAYS
      */
-    function stakeForAccount(address _fundingAccount, address _account, uint256 _amount, uint256 _duration) payable external nonReentrant {
+    function stakeForAccount(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration) payable external nonReentrant {
         _validateHandler();
         _stake(_fundingAccount, _account, _amount, _duration);
     }
 
-    function _stake(address _fundingAccount, address _account, uint256 _amount, uint256 _duration) private {
+    function _stake(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration) private {
         require(_amount > 0, "Reward Tracker: invalid amount");
         require(msg.value == _amount, "LogxStaker: msg.value != amount");
 
@@ -247,9 +247,9 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         @param _deposiToken will be the address of $LOGX token
         @param _stakeId is the ID of the stake which has to be unstaked
      */
-    function unstake(bytes32 _stakeId) external nonReentrant returns(uint256){
+    function unstake(bytes32 account, bytes32 _stakeId) external nonReentrant returns(uint256){
         if(inPrivateStakingMode) { revert("LogxStaker: action not enabled"); }
-        return _unstake(msg.sender, msg.sender, _stakeId);
+        return _unstake(account, msg.sender, _stakeId);
     }
 
     /**
@@ -258,14 +258,14 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         @param _receiver will be the address which will receive LogX tokens
         @param _stakeId is the ID of the stake which has to be unstaked
      */
-    function unstakeForAccount(address _account, address _receiver, bytes32 _stakeId) external nonReentrant returns(uint256){
+    function unstakeForAccount(bytes32 _account, address _receiver, bytes32 _stakeId) external nonReentrant returns(uint256){
         _validateHandler();
         return _unstake(_account, _receiver, _stakeId);
     }
 
-    function _unstake(address _account, address _receiver, bytes32 stakeId) private returns(uint256) {
+    function _unstake(bytes32 _account, address _receiver, bytes32 stakeId) private returns(uint256) {
         require(!isStakeActive(stakeId), "LogxStaker: staking duration active");
-        address accountForStakeId = getAccountForStakeId(stakeId);
+        bytes32 accountForStakeId = getAccountForStakeId(stakeId);
         require(accountForStakeId == _account, "LogxStaker: invalid _stakeId for _account");
 
         _updateRewards(_account, stakeId);
@@ -297,18 +297,18 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     /**
         Re-staking User Flow
      */
-    function restake(bytes32 _stakeId, uint256 _duration) external nonReentrant {
+    function restake(bytes32 _account, bytes32 _stakeId, uint256 _duration) external nonReentrant {
         if(inPrivateStakingMode) { revert("LogxStaker: action not enabled"); }
-        _restake(msg.sender, _stakeId, _duration);
+        _restake(_account, _stakeId, _duration);
     }
 
-    function restakeForAccount(address _account, bytes32 _stakeId, uint256 _duration) external nonReentrant {
+    function restakeForAccount(bytes32 _account, bytes32 _stakeId, uint256 _duration) external nonReentrant {
         _validateHandler();
         _restake(_account, _stakeId, _duration);
     }
 
-    function _restake(address _account, bytes32 _stakeId, uint256 _duration) private {
-        address accountForStakeId = getAccountForStakeId(_stakeId);
+    function _restake(bytes32 _account, bytes32 _stakeId, uint256 _duration) private {
+        bytes32 accountForStakeId = getAccountForStakeId(_stakeId);
         require(accountForStakeId == _account, "LogxStaker: invalid _stakeId for _account");
         require(!isStakeActive(_stakeId), "LogxStaker: staking duration active");
 
@@ -319,16 +319,16 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     /**
         Claim Tokens User Flow
      */
-    function claimTokens() external nonReentrant returns (uint256) {
-        return _claimTokens(msg.sender, msg.sender);
+    function claimTokens(bytes32 _account) external nonReentrant returns (uint256) {
+        return _claimTokens(_account, msg.sender);
     }
 
-    function claimTokensForAccount(address _account, address _receiver) external nonReentrant returns (uint256) {
+    function claimTokensForAccount(bytes32 _account, address _receiver) external nonReentrant returns (uint256) {
         _validateHandler();
         return _claimTokens(_account, _receiver);
     }
 
-    function _claimTokens(address _account, address _receiver) private returns (uint256) {    
+    function _claimTokens(bytes32 _account, address _receiver) private returns (uint256) {    
         bytes32[] memory userStakeIds = userIds[_account];
         for(uint256 i=0; i < userStakeIds.length; i++) {
             _updateRewards(_account, userStakeIds[i]);
@@ -372,7 +372,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         return block.timestamp < (userStake.startTime + durationInSeconds);
     }
 
-    function _addStake(address _account, uint256 _amount, uint256 _duration) private {
+    function _addStake(bytes32 _account, uint256 _amount, uint256 _duration) private {
         uint256 nonce = userNonces[_account]++;
         uint256 startTime = block.timestamp;
 
@@ -401,7 +401,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     }   
 
     //Note - think of ways to make this function more gas efficient
-    function _removeStake(address _account, bytes32 _stakeId) private {
+    function _removeStake(bytes32 _account, bytes32 _stakeId) private {
         require(stakes[_stakeId].startTime != 0, "Stake does not exist.");
 
         // Delete the stake from the stakes mapping
@@ -439,7 +439,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     }
 
     //Note - following is the most important function in the contract.
-    function _updateRewards(address _account, bytes32 stakeId) private {
+    function _updateRewards(bytes32 _account, bytes32 stakeId) private {
         Stake memory userStake = stakes[stakeId];
         
         uint256 stakeDurationEndTimestamp = userStake.startTime + (userStake.duration * 1 days);
