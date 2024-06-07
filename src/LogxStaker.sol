@@ -225,6 +225,8 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
 
         _addStake(_account, _amount, _duration);
         //ToDo - Since during mint we are depositing the st LogX tokens to funding account, the expectation here is that
+        // the tokens to be burnt during unstake are also held by the receiver.
+        _mint(_fundingAccount, _amount);
     }
 
     function _mint(address _account, uint256 _amount) internal {
@@ -273,6 +275,8 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         totalDepositSupply = totalDepositSupply - amount;
 
         _removeStake(_account, stakeId);
+        //Note - the staked LogX tokens are minted to funding account and not the user.
+        _burn(_receiver, amount);
 
         return amount;
     }
