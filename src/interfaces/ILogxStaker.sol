@@ -13,8 +13,8 @@ interface ILogxStaker {
     function withdrawToken(address _token, address _account, uint256 _amount) external;
 
     // Token balance and staking
-    function stake(bytes32 _account, uint256 _amount, uint256 _duration) external;
-    function stakeForAccount(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration) external;
+    function stake(bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime) external;
+    function stakeForAccount(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime) external;
     function unstake(bytes32 _account, bytes32 _stakeId) external returns(uint256);
     function unstakeForAccount(bytes32 _account, address _receiver, bytes32 _stakeId) external returns(uint256);
     function restake(bytes32 account, bytes32 _stakeId, uint256 _duration) external;
