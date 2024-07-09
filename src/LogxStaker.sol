@@ -376,7 +376,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
                 _amount,
                 _duration,
                 apy,
-                startTime
+                _startTime
             )
         );
 
@@ -385,7 +385,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
             amount: _amount,
             duration: _duration,
             apy: apy,
-            startTime: startTime
+            startTime: _startTime
         });
         userIds[_account].push(stakeId);
         lastRewardsTime[stakeId] = block.timestamp;
@@ -448,5 +448,5 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         claimableTokens[_account] = claimableTokens[_account] + rewardTokens;
     }
 
-    function receive() external payable{}
+    receive() external payable{}
 }
