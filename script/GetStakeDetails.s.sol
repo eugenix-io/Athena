@@ -10,7 +10,7 @@ contract GetStakerDetails is Script {
     LogxStaker logxStaker =
         LogxStaker(payable(0xd9f398f3B4fe819B2811cCd65C9a31a13427028a));
 
-    function run() external {
+    function run() external view {
         bytes32 stake_id = 0x6cf15f1c9fa7da9f62e08b3828761aaffdb4db1dc5ae6e71167fbd331e677c27;
         bytes32 subaccount = 0x0000000000016d1cb5da5f00cd3c9aef83a30222e65bea2aa2c3000000000001;
 

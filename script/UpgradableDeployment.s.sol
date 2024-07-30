@@ -40,13 +40,12 @@ contract UpgradableDeploymentScript is Script {
         return address(proxy);
     }
 
-    function updateLogxStakerImplementation() internal returns(address) {
+    function updateLogxStakerImplementation() internal {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_ADMIN");
         vm.startBroadcast(deployerPrivateKey); 
         LogxStaker logXStaker = new LogxStaker();
         ProxyAdmin proxyAdmin = ProxyAdmin(0x5e576B171ba6AF1a7f6326f26C1dd133937Ab5C9);
         proxyAdmin.upgradeAndCall(ITransparentUpgradeableProxy(0x60ADED80894B0dC2B7C7856d808257796f641429), address(logXStaker), "");
         vm.stopBroadcast();
-
     }
 }

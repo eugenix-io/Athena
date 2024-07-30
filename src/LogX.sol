@@ -61,8 +61,8 @@ contract LogX is IERC20, ILogX {
         IERC20(_token).safeTransfer(_account, _amount);
     }
 
-    function id() external pure returns (string memory _name) {
-        return "$LOGX";
+    function id() external view returns (string memory) {
+        return symbol;
     }
 
     function balanceOf(address _account) external view override returns (uint256) {
