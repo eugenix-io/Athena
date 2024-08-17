@@ -157,7 +157,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     function getUnclaimedUserRewards(bytes32 _account) external view returns (uint256) {
         bytes32[] memory userStakeIds = userIds[_account];
         uint256 accruedRewards;
-        for(uint256 i=0; i < userStakeIds.length; i++) {
+        for(uint256 i=0; i < userStakeIds.length; ++i) {
             accruedRewards = accruedRewards + _getUnclaimedRewards(userStakeIds[i]);
         }
         return accruedRewards;
@@ -316,7 +316,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
 
     function _claimTokens(bytes32 _account, address _receiver) private returns (uint256) {    
         bytes32[] memory userStakeIds = userIds[_account];
-        for(uint256 i=0; i < userStakeIds.length; i++) {
+        for(uint256 i=0; i < userStakeIds.length; ++i) {
             _updateRewards(_account, userStakeIds[i]);
         }
 
@@ -391,7 +391,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
 
         uint256 index;
         bool found = false;
-        for (uint256 i = 0; i < userIds[_account].length; i++) {
+        for (uint256 i = 0; i < userIds[_account].length; ++i) {
             if (userIds[_account][i] == _stakeId) {
                 index = i;
                 found = true;
