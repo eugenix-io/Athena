@@ -44,6 +44,7 @@ contract LogX is IERC20, ILogX {
     }
 
     function setGov(address _gov) external onlyGov {
+        require(_gov != address(0), "LogX: invalid address");
         gov = _gov;
     }
 
@@ -53,6 +54,7 @@ contract LogX is IERC20, ILogX {
     }
 
     function setMinter(address _minter, bool _isActive) external override onlyGov {
+        require(_minter != address(0), "LogX: invalid address");
         isMinter[_minter] = _isActive;
     }
 

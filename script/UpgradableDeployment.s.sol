@@ -19,7 +19,7 @@ contract UpgradableDeploymentScript is Script {
         // console.log("Proxy Admin: ", address(proxyAdmin));
         // address stakerProxy = deployLogXStaker(address(proxyAdmin));
         // console.log("Staker Proxy: ", stakerProxy);
-        deployLogXStaker(0xE5d5aC6988be36e5B4e5A4D539cFA9a1790C94f0);
+        deployLogXStaker(0xE9CA07f802d35680F7C0BBAD84E61eBe8b6E38d8);
         vm.stopBroadcast();
 
 

@@ -94,6 +94,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     }
 
     function setHandler(address _handler, bool _isActive) external onlyOwner {
+        require(_handler != address(0), "Handler address cannot be zero");
         isHandler[_handler] = _isActive;
     }
 
