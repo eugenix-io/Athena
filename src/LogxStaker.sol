@@ -113,7 +113,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         @param _apy to be passed considering (including) BASIS_POINTS_DIVISOR which is 10^4
      */
     function setAPRForDurationInDays(uint256 _duration, uint256 _apy) external onlyOwner {
-        require(_apy > 0, "APR cannot be negative");
+        require(_apy != 0, "APR cannot be 0");
         apyForDuration[_duration] = _apy;
     }
 
@@ -207,7 +207,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     }
 
     function _stake(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime) private {
-        require(_amount > 0, "Reward Tracker: invalid amount");
+        require(_amount != 0, "Reward Tracker: invalid amount");
 
         stakedAmounts[_account] = stakedAmounts[_account] + _amount;
         totalDepositSupply = totalDepositSupply + _amount;
