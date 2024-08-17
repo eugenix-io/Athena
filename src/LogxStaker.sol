@@ -28,9 +28,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     //Global Variables
     string public name;
     string public symbol;
-    bool public inPrivateTransferMode;
     bool public inPrivateStakingMode;
-    bool public inPrivateClaimingMode;
     uint256 public totalSupply;
     uint256 public totalDepositSupply;
     uint256 public cumulativeFeeRewardPerToken;
@@ -81,16 +79,8 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         apyForDuration[90] = 300000;
     }
 
-    function setInPrivateTransferMode(bool _inPrivateTransferMode) external onlyOwner {
-        inPrivateTransferMode = _inPrivateTransferMode;
-    }
-
     function setInPrivateStakingMode(bool _inPrivateStakingMode) external onlyOwner {
         inPrivateStakingMode = _inPrivateStakingMode;
-    }
-
-    function setInPrivateClaimingMode(bool _inPrivateClaimingMode) external onlyOwner {
-        inPrivateClaimingMode = _inPrivateClaimingMode;
     }
 
     function setHandler(address _handler, bool _isActive) external onlyOwner {
