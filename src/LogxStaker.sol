@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.19;
+pragma solidity ^0.8.19;
 
 /**
     @title LogxStaker
@@ -152,7 +152,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     function getUnclaimedUserRewards(bytes32 _account) external view returns (uint256) {
         bytes32[] memory userStakeIds = userIds[_account];
         uint256 accruedRewards;
-        for(uint256 i=0; i < userStakeIds.length; ++i} {
+        for(uint256 i=0; i < userStakeIds.length; ++i) {
             accruedRewards = accruedRewards + _getUnclaimedRewards(userStakeIds[i]);
         }
         return accruedRewards;
