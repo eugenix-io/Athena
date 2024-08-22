@@ -192,16 +192,6 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     /**
         Staking User Flow
      */
-    /**
-        @dev
-        @param _deposiToken will be the address of $LOGX token
-        @param _amount will be the amount of $LOGX to be staked (denominated in 10 ^ 18)
-        @param _duration will be the duration for which _amount will be staked in DAYS
-     */
-    function stake(bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime) external nonReentrant {
-        if(inPrivateStakingMode) { revert("LogxStaker: staking action not enabled"); }
-        _stake(msg.sender, _account, _amount, _duration, _startTime);
-    }
 
     /**
         @dev
@@ -210,18 +200,18 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         @param _amount will be the amount of $LOGX to be staked (denominated in 10 ^ 18)
         @param _duration will be the duration for which _amount will be staked in DAYS
      */
-    function stakeForAccount(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime) external nonReentrant {
+    function stakeForAccount(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime, uint256 nonce) external nonReentrant {
         _validateHandler();
-        _stake(_fundingAccount, _account, _amount, _duration, _startTime);
+        _stake(_fundingAccount, _account, _amount, _duration, _startTime, nonce);
     }
 
-    function _stake(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime) private {
+    function _stake(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime, uint256 nonce) private {
         require(_amount > 0, "Reward Tracker: invalid amount");
 
         stakedAmounts[_account] = stakedAmounts[_account] + _amount;
         totalDepositSupply = totalDepositSupply + _amount;
 
-        _addStake(_account, _amount, _duration, _startTime);
+        _addStake(_account, _amount, _duration, _startTime, nonce);
         //ToDo - Since during mint we are depositing the st LogX tokens to funding account, the expectation here is that
         // the tokens to be burnt during unstake are also held by the receiver.
         _mint(_fundingAccount, _amount);
@@ -239,15 +229,6 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     /**
         Unstaking User Flow
      */
-     /**
-        @dev
-        @param _deposiToken will be the address of $LOGX token
-        @param _stakeId is the ID of the stake which has to be unstaked
-     */
-    function unstake(bytes32 account, bytes32 _stakeId) external nonReentrant returns(uint256){
-        if(inPrivateStakingMode) { revert("LogxStaker: action not enabled"); }
-        return _unstake(account, msg.sender, _stakeId);
-    }
 
     /**
         @dev
@@ -314,9 +295,6 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     /**
         Claim Tokens User Flow
      */
-    function claimTokens(bytes32 _account) external nonReentrant returns (uint256) {
-        return _claimTokens(_account, msg.sender);
-    }
 
     function claimTokensForAccount(bytes32 _account, address _receiver) external nonReentrant returns (uint256) {
         _validateHandler();
@@ -367,7 +345,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         return block.timestamp < (userStake.startTime + durationInSeconds);
     }
 
-    function _addStake(bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime) private {
+    function _addStake(bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime, uint256 nonce) private {
         uint256 apy = _getApyForDuration(_duration);
 
         bytes32 stakeId = keccak256(
@@ -376,7 +354,8 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
                 _amount,
                 _duration,
                 apy,
-                _startTime
+                _startTime,
+                nonce
             )
         );
 
