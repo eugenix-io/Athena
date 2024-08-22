@@ -19,8 +19,8 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     using SafeERC20 for IERC20;
 
     //Constants
-    uint256 public constant PRECISION = 1e12;
-    uint256 public constant BASIS_POINTS_DIVISOR = 10000;
+    uint256 internal constant PRECISION = 1e12;
+    uint256 internal constant BASIS_POINTS_DIVISOR = 10000;
     uint256 constant YEAR_IN_SECONDS = 365 days;
 
     uint8 public constant decimals = 18;
