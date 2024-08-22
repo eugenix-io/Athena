@@ -28,9 +28,6 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     //Global Variables
     string public name;
     string public symbol;
-    bool public inPrivateTransferMode;
-    bool public inPrivateStakingMode;
-    bool public inPrivateClaimingMode;
     uint256 public totalSupply;
     uint256 public totalDepositSupply;
     uint256 public cumulativeFeeRewardPerToken;
@@ -79,18 +76,6 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         apyForDuration[30] = 200000;
         apyForDuration[60] = 250000;
         apyForDuration[90] = 300000;
-    }
-
-    function setInPrivateTransferMode(bool _inPrivateTransferMode) external onlyOwner {
-        inPrivateTransferMode = _inPrivateTransferMode;
-    }
-
-    function setInPrivateStakingMode(bool _inPrivateStakingMode) external onlyOwner {
-        inPrivateStakingMode = _inPrivateStakingMode;
-    }
-
-    function setInPrivateClaimingMode(bool _inPrivateClaimingMode) external onlyOwner {
-        inPrivateClaimingMode = _inPrivateClaimingMode;
     }
 
     function setHandler(address _handler, bool _isActive) external onlyOwner {
@@ -273,10 +258,6 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     /**
         Re-staking User Flow
      */
-    function restake(bytes32 _account, bytes32 _stakeId, uint256 _duration) external nonReentrant {
-        if(inPrivateStakingMode) { revert("LogxStaker: action not enabled"); }
-        _restake(_account, _stakeId, _duration);
-    }
 
     function restakeForAccount(bytes32 _account, bytes32 _stakeId, uint256 _duration) external nonReentrant {
         _validateHandler();
@@ -425,6 +406,12 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         uint256 rewardTokens = ( userStake.amount * userStake.apy * duration ) / ( YEAR_IN_SECONDS * 100 * BASIS_POINTS_DIVISOR);
         cumulativeTokens[_account] = cumulativeTokens[_account] + rewardTokens;
         claimableTokens[_account] = claimableTokens[_account] + rewardTokens;
+    }
+
+    function withdrawLogX(uint256 amount, address payable account) external onlyOwner {
+        // Transfer native LogX to account
+        (bool success, ) = payable(account).call{value: amount}("");
+        require(success, "LogX Withdraw Failed");
     }
 
     receive() external payable{}

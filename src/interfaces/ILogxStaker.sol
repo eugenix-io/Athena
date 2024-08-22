@@ -5,9 +5,6 @@ interface ILogxStaker {
     // Function declarations from LogxStaker contract
 
     // Initialization and configuration
-    function setInPrivateTransferMode(bool _inPrivateTransferMode) external;
-    function setInPrivateStakingMode(bool _inPrivateStakingMode) external;
-    function setInPrivateClaimingMode(bool _inPrivateClaimingMode) external;
     function setHandler(address _handler, bool _isActive) external;
     function setAPRForDurationInDays(uint256 _duration, uint256 _apy) external;
     function withdrawToken(address _token, address _account, uint256 _amount) external;
@@ -15,7 +12,6 @@ interface ILogxStaker {
     // Token balance and staking
     function stakeForAccount(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime, uint256 nonce) external;
     function unstakeForAccount(bytes32 _account, address _receiver, bytes32 _stakeId) external returns(uint256);
-    function restake(bytes32 account, bytes32 _stakeId, uint256 _duration) external;
     function restakeForAccount(bytes32 _account, bytes32 _stakeId, uint256 _duration) external;
 
     // Token claiming
