@@ -10,12 +10,12 @@ import "../libraries/token/IERC20.sol";
 import "../libraries/token/SafeERC20.sol";
 import "../libraries/utils/ReentrancyGuard.sol";
 import "../access/Governable.sol";
-import "openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
 
 //Interfaces
 import "./interfaces/ILogxStaker.sol";
 
-contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable {
+contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Ownable2StepUpgradeable {
     using SafeERC20 for IERC20;
 
     //Constants
