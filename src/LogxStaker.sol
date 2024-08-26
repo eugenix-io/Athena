@@ -87,19 +87,19 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     //ToDo - we have to figure out if wallets will show st$LOGX as an ERC20 contract even if 
     //  LogxStaker is an abstract contract without the following functions - transfer, allowance, approve, transferFrom
     function transfer(address recipient, uint256 amount) external returns (bool) {
-        revert("Transfer of staked $LOGX not allowed");
+        revert("stLogX transfer not allowed");
     }
 
     function allowance(address owner, address spender) external view returns (uint256) {
-        revert("Allowance for staked $LOGX not allowed");
+        revert("stLogX allowance not allowed");
     }
 
     function approve(address spender, uint256 amount) external returns (bool) {
-        revert("Approvals for staked $LOGX not allowed");
+        revert("stLogX approve not allowed");
     }
 
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool) {
-        revert("Transfer From staked $LOGX not allowed");
+        revert("stLogX transferFrom not allowed");
     }
 
     /**
@@ -204,7 +204,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     }
 
     function _mint(address _account, uint256 _amount) internal {
-        require(_account != address(0), "Reward Tracker: mint to zero address");
+        require(_account != address(0), "Mint to zero address");
 
         totalSupply = totalSupply + _amount;
         balances[_account] = balances[_account] + _amount;
@@ -228,9 +228,9 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     }
 
     function _unstake(bytes32 _account, address _receiver, bytes32 stakeId) private returns(uint256) {
-        require(!isStakeActive(stakeId), "LogxStaker: staking duration active");
+        require(!isStakeActive(stakeId), "Staking duration active");
         bytes32 accountForStakeId = getAccountForStakeId(stakeId);
-        require(accountForStakeId == _account, "LogxStaker: invalid _stakeId for _account");
+        require(accountForStakeId == _account, "Invalid stakeId for account");
 
         _updateRewards(_account, stakeId);
 
@@ -247,8 +247,8 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
     }
 
     function _burn(address _account, uint256 _amount) internal {
-        require(_account != address(0), "LogxStaker: burn from zero address");
-        require(balances[_account] >= _amount, "LogxStaker: burn amount exceeds balance");
+        require(_account != address(0), "Burn from zero address");
+        require(balances[_account] >= _amount, "Burn amount exceeds balance");
 
         balances[_account] = balances[_account] - _amount;
         totalSupply = totalSupply - _amount;
@@ -267,8 +267,8 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
 
     function _restake(bytes32 _account, bytes32 _stakeId, uint256 _duration) private {
         bytes32 accountForStakeId = getAccountForStakeId(_stakeId);
-        require(accountForStakeId == _account, "LogxStaker: invalid _stakeId for _account");
-        require(!isStakeActive(_stakeId), "LogxStaker: staking duration active");
+        require(accountForStakeId == _account, "invalid _stakeId for _account");
+        require(!isStakeActive(_stakeId), "staking duration active");
 
         _updateRewards(_account, _stakeId);
         _updateStake(_stakeId, _duration);
@@ -302,7 +302,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
         Utility functions
      */
     function _validateHandler() private view {
-        require(isHandler[msg.sender], "RewardTracker : handler validation");
+        require(isHandler[msg.sender], "Invalid handler");
     }
 
     function _getApyForDuration(uint256 _duration) internal view returns (uint256){
@@ -373,7 +373,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, OwnableUpgradeable 
             userIds[_account][index] = userIds[_account][userIds[_account].length - 1];
             userIds[_account].pop();
         } else {
-            revert("Stake ID not found for the account.");
+            revert("Stakeid not found");
         }
     }
 
