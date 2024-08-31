@@ -9,6 +9,7 @@ pragma solidity ^0.8.19;
 import "../libraries/token/IERC20.sol";
 import "../libraries/token/SafeERC20.sol";
 import "./interfaces/ILogX.sol";
+import "./common/Errors.sol";
 
 contract LogX is IERC20, ILogX {
     using SafeERC20 for IERC20;
@@ -44,6 +45,7 @@ contract LogX is IERC20, ILogX {
     }
 
     function setGov(address _gov) external onlyGov {
+        require(_gov != address(0), "LogX: invalid address");
         gov = _gov;
     }
 
@@ -53,6 +55,7 @@ contract LogX is IERC20, ILogX {
     }
 
     function setMinter(address _minter, bool _isActive) external override onlyGov {
+        require(_minter != address(0), "LogX: invalid address");
         isMinter[_minter] = _isActive;
     }
 
@@ -85,7 +88,7 @@ contract LogX is IERC20, ILogX {
 
     function transferFrom(address _sender, address _recipient, uint256 _amount) external override returns (bool) {
         uint256 allowanceAmount = allowances[_sender][msg.sender];
-        require(allowanceAmount >= _amount, "LogX: transfer amount exceeds allowance");
+        require(allowanceAmount >= _amount, ERR_TRANSFER_AMOUNT_EXCEEDS_ALLOWANCE);
         uint256 nextAllowance = allowances[_sender][msg.sender] - _amount;
         _approve(_sender, msg.sender, nextAllowance);
         _transfer(_sender, _recipient, _amount);
@@ -111,7 +114,7 @@ contract LogX is IERC20, ILogX {
 
     function _burn(address _account, uint256 _amount) internal {
         require(_account != address(0), "LogX: burn from the zero address");
-        require(balances[_account] >= _amount, "LogX: burn amount exceeds balance");
+        require(balances[_account] >= _amount, ERR_BURN_AMOUNT_EXCEEDS_BALANCE);
         balances[_account] = balances[_account] - _amount;
         totalSupply = totalSupply - _amount;
 
@@ -119,11 +122,11 @@ contract LogX is IERC20, ILogX {
     }
 
     function _transfer(address _sender, address _recipient, uint256 _amount) private {
-        require(_sender != address(0), "LogX: transfer from the zero address");
-        require(_recipient != address(0), "LogX: transfer to the zero address");
+        require(_sender != address(0), ERR_TRANSFER_FROM_ZERO_ADDRESS);
+        require(_recipient != address(0), ERR_TRANSFER_TO_ZERO_ADDRESS);
         //Note - since $LOGX will be used as gas token on Orbit chain, transfering the token to self should not be allowed.
         require(_sender != _recipient, "LogX: transfer to self");
-        require(balances[_sender] >= _amount, "LogX: transfer amount exceeds balance");
+        require(balances[_sender] >= _amount, ERR_TRANSFER_AMOUNT_EXCEEDS_BALANCE);
 
         balances[_sender] = balances[_sender] - _amount;
         balances[_recipient] = balances[_recipient] + _amount;
@@ -132,8 +135,8 @@ contract LogX is IERC20, ILogX {
     }
 
     function _approve(address _owner, address _spender, uint256 _amount) private {
-        require(_owner != address(0), "LogX: approve from the zero address");
-        require(_spender != address(0), "LogX: approve to the zero address");
+        require(_owner != address(0), ERR_APPROVE_FROM_ZERO_ADDRESS);
+        require(_spender != address(0), ERR_APPROVE_TO_ZERO_ADDRESS);
 
         allowances[_owner][_spender] = _amount;
 
