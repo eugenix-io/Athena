@@ -38,7 +38,8 @@ contract GetStakerDetails is Script {
         }
 
         uint256 claimableRewards = logxStaker.getStakeIdRewards(
-            stake_id
+            stake_id,
+            block.timestamp
         );
 
         console.log("Claimable Rewards: ", claimableRewards);
