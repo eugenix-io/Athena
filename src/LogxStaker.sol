@@ -186,18 +186,18 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Ownable2StepUpgrade
         @param _amount will be the amount of $LOGX to be staked (denominated in 10 ^ 18)
         @param _duration will be the duration for which _amount will be staked in DAYS
      */
-    function stakeForAccount(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime, uint256 nonce, uint256 timestamp) external nonReentrant {
+    function stakeForAccount(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime, uint256 nonce) external nonReentrant {
         _validateHandler();
-        _stake(_fundingAccount, _account, _amount, _duration, _startTime, nonce, timestamp);
+        _stake(_fundingAccount, _account, _amount, _duration, _startTime, nonce);
     }
 
-    function _stake(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime, uint256 nonce, uint256 timestamp) private {
+    function _stake(address _fundingAccount, bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime, uint256 nonce) private {
         require(_amount != 0, "Reward Tracker: invalid amount");
 
         stakedAmounts[_account] = stakedAmounts[_account] + _amount;
         totalDepositSupply = totalDepositSupply + _amount;
 
-        _addStake(_account, _amount, _duration, _startTime, nonce, timestamp);
+        _addStake(_account, _amount, _duration, _startTime, nonce);
         //ToDo - Since during mint we are depositing the st LogX tokens to funding account, the expectation here is that
         // the tokens to be burnt during unstake are also held by the receiver.
         _mint(_fundingAccount, _amount);
@@ -325,7 +325,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Ownable2StepUpgrade
         return timestamp < (userStake.startTime + durationInSeconds);
     }
 
-    function _addStake(bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime, uint256 nonce, uint256 timestamp) private {
+    function _addStake(bytes32 _account, uint256 _amount, uint256 _duration, uint256 _startTime, uint256 nonce) private {
         uint256 apy = _getApyForDuration(_duration);
 
         bytes32 stakeId = keccak256(
@@ -347,7 +347,7 @@ contract LogxStaker is IERC20, ILogxStaker, ReentrancyGuard, Ownable2StepUpgrade
             startTime: _startTime
         });
         userIds[_account].push(stakeId);
-        lastRewardsTime[stakeId] = timestamp;
+        lastRewardsTime[stakeId] = _startTime;
     }   
 
     //Note - think of ways to make this function more gas efficient
