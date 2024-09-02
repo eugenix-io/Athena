@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 interface ILogxStaker {
 
     // Governance functions
-    function initialize(uint256 _apy) external;
+    function initialize(address logxTokenAddress) external;
     function setHandler(address _handler, bool _isActive) external;
     function setCumulativeEarningsRate(uint256 _rate) external;
 

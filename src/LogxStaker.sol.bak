@@ -14,7 +14,7 @@ import "../access/Governable.sol";
 //Interfaces
 import "./interfaces/ILogxStaker_Old.sol";
 
-contract LogxStaker_Old is IERC20, ILogxStaker_Old, ReentrancyGuard, Governable {
+contract LogxStakerBackup is IERC20, ILogxStakerBackup, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
 
     //Constants

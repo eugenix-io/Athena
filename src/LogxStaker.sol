@@ -19,6 +19,7 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
     //Global Variables
     string public name;
     string public symbol;
+    address public logxTokenAddress;
     bool public isInitialized;
     uint256 cumulativeEarningsRate;
     uint256 public totalSupply;
@@ -44,9 +45,17 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
     /**
         Governance functions
      */
-    // NOTE - we can probably remove this initialisation function
-    function initialize(uint256 _apy) external onlyGov {
+    /***
+        @dev
+        @param _logxTokenAddress $LOGX token address when deploying contract.
+        @note we can set the address of $LOGX token ONLY ONCE to prevent attacks, 
+            we have to add a setter function if we want to change the token ERC20 address changes in the future
+     */
+    function initialize(address _logxTokenAddress) external onlyGov {
         require(!isInitialized, "LogxStaker: already initialized");
+
+        logxTokenAddress = _logxTokenAddress;
+
         isInitialized = true;
     }
 
@@ -54,6 +63,15 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
         isHandler[_handler] = _isActive;
     }
 
+    /**
+        User Handler functions
+     */
+     /***
+    /***
+        @dev
+        @param _rate current cumulative earning rate $LOGX token
+        @note this function determines the rewards to be distributed, can be updated only by handler.
+     */
     function setCumulativeEarningsRate(uint256 _rate) external {
         _validateHandler();
 
@@ -61,12 +79,21 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
     }
 
     /**
-        Feature functions
+        User Functions functions
      */
+     /***
+     @dev
+     @param subAccountId of the user
+     @param amount of LogX ERC20 tokens being staked (denominated in 10^18)
+     @param receiver wallet address of the user 
+      */
     function stakeForAccount(bytes32 subAccountId, uint256 amount, address receiver) payable external nonReentrant returns (uint256) {
         _validateHandler();
         require(amount > 0, "Reward Tracker: invalid amount");
-        require(msg.value == amount, "LogxStaker: msg.value != amount");
+        
+        IERC20 token = IERC20(logxTokenAddress);
+        require(token.transferFrom(msg.sender, address(this), amount), "LogxStaker: LogX token transfer failed");
+
 
         // Create a storage reference to the stake
         Stake storage stake = stakes[subAccountId];
@@ -90,6 +117,14 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
     }
 
 
+    /**
+        Feature functions
+     */
+     /***
+     @dev
+     @param subAccountId of the user
+     @param receiver wallet address of the user 
+      */
     function claimForAccount(bytes32 subAccountId, address receiver) external nonReentrant returns(uint256){
         _validateHandler();
 
@@ -106,17 +141,35 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
         return claimedRewards;
     }
 
+    /**
+        Feature functions
+     */
+     /***
+     @dev
+     @param subAccountId of the user
+     @param receiver wallet address of the user 
+     @note that this function will transfer $LOGX to user's address whenever a user stakes, unstakes or claims rewards.
+      */
     function _claimForAccount(bytes32 subAccountId, address _receiver) private returns(uint256) {
         Stake memory stake = stakes[subAccountId];
 
         uint256 rewards = (stake.amount * (cumulativeEarningsRate - stake.cumulativeEarningsRate)) / PRECISION;
-        (bool success,) = payable(_receiver).call{value: rewards}("");
-        require(success, "LogX claimed");
-        emit Claim(_receiver, rewards);
+        IERC20 token = IERC20(logxTokenAddress);
+        token.safeTransfer(_receiver, rewards);
 
+        emit Claim(_receiver, rewards);
         return rewards;
     }
 
+    /**
+        Feature functions
+     */
+     /***
+     @dev
+     @param subAccountId of the user
+     @param amount of LogX ERC20 tokens being staked (denominated in 10^18)
+     @param receiver wallet address of the user 
+      */
     function unstakeForAccount(bytes32 subAccountId, uint256 amount, address receiver) external nonReentrant() returns(uint256) {
         _validateHandler();
         require(amount > 0, "Reward Tracker: invalid amount");
@@ -135,6 +188,9 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
         balances[receiver] = balances[receiver] - amount;
         totalSupply = totalSupply - amount;
 
+        IERC20 token = IERC20(logxTokenAddress);
+        token.safeTransfer(receiver, amount);
+
         return claimedRewards;
     }
 
@@ -149,9 +205,8 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
         return balances[_account];
     }
 
-    //ERC20 contract functions which are not supported on staked $LOGX token
-    //ToDo - we have to figure out if wallets will show st$LOGX as an ERC20 contract even if 
-    //  LogxStaker is an abstract contract without the following functions - transfer, allowance, approve, transferFrom
+    //@note ERC20 contract functions that are not supported on staked $LOGX token
+    //      These functions can be updated in a later version to dictate network economy.
     function transfer(address recipient, uint256 amount) external returns (bool) {
         revert("Transfer of staked $LOGX not allowed");
     }
