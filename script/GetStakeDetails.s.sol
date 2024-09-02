@@ -37,10 +37,10 @@ contract GetStakerDetails is Script {
             console.logBytes32(ids[i]);
         }
 
-        uint256 claimableRewards = logxStaker.getStakeIdRewards(
-            stake_id
-        );
+        // uint256 claimableRewards = logxStaker.getStakeIdRewards(
+        //     stake_id
+        // );
 
-        console.log("Claimable Rewards: ", claimableRewards);
+        // console.log("Claimable Rewards: ", claimableRewards);
     }
 }

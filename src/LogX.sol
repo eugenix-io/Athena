@@ -20,6 +20,7 @@ contract LogX is IERC20, ILogX {
 
     //ToDo - add a limit of 1 billion tokens on total supply
     uint256 public override totalSupply;
+    uint256 public maxSupply = 1_000_000_000 * 1e18; // 1 billion tokens
     
     address public gov;
 
@@ -96,6 +97,7 @@ contract LogX is IERC20, ILogX {
     }
 
     function mint(address _account, uint256 _amount) external override onlyMinter {
+        require(totalSupply + _amount <= maxSupply, ERR_MINT_AMOUNT_EXCEEDS_MAX_SUPPLY);
         _mint(_account, _amount);
     }
 
