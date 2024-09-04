@@ -30,8 +30,8 @@ contract UpgradableDeploymentScript is Script {
         console.log("logxStaker Implementation: ", address(logXStaker));
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(address(logXStaker),proxyAdmin,"");
         LogxStaker proxyContract = LogxStaker(payable(address(proxy)));
-        console.log("Proxy Address: ", address(proxy));
-        proxyContract.initialize("Staked LogX","stLogX");
+        proxyContract.initialize(address(0), "Staked LogX", "stLogX");
+        return address(proxy);
 
         //set CH as handler
         proxyContract.setHandler(clearingHouse, true); 
