@@ -37,11 +37,6 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
         uint256 amount;
     }
 
-    constructor(string memory _name, string memory _symbol) {
-        name = _name;
-        symbol = _symbol;
-    }
-
     /**
         Governance functions
      */
@@ -51,10 +46,12 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
         @note we can set the address of $LOGX token ONLY ONCE to prevent attacks, 
             we have to add a setter function if we want to change the token ERC20 address changes in the future
      */
-    function initialize(address _logxTokenAddress) external onlyGov {
+    function initialize(address _logxTokenAddress, string memory _name, string memory _symbol) external onlyGov {
         require(!isInitialized, "LogxStaker: already initialized");
 
         logxTokenAddress = _logxTokenAddress;
+        name = _name;
+        symbol = _symbol;
 
         isInitialized = true;
     }
@@ -109,6 +106,8 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
         }
         balances[receiver] = balances[receiver] + amount;
         totalSupply = totalSupply + amount;
+
+        emit Transfer(address(0), receiver, amount);
 
         return claimedRewards;
     }
@@ -181,6 +180,8 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
 
         balances[receiver] = balances[receiver] - amount;
         totalSupply = totalSupply - amount;
+
+        emit Transfer(receiver, address(0), amount);
 
         return claimedRewards;
     }
