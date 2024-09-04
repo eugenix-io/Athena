@@ -4,12 +4,12 @@ pragma solidity ^0.8.19;
 import "../libraries/token/IERC20.sol";
 import "../libraries/token/SafeERC20.sol";
 import "../libraries/utils/ReentrancyGuard.sol";
-import "../access/Governable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
 
 //Interfaces
 import "./interfaces/ILogxStaker.sol";
 
-contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
+contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgradeable {
     using SafeERC20 for IERC20;
 
     //Constants
@@ -20,7 +20,6 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
     string public name;
     string public symbol;
     address public logxTokenAddress;
-    bool public isInitialized;
     uint256 cumulativeEarningsRate;
     uint256 public totalSupply;
 
@@ -46,17 +45,19 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Governable {
         @note we can set the address of $LOGX token ONLY ONCE to prevent attacks, 
             we have to add a setter function if we want to change the token ERC20 address changes in the future
      */
-    function initialize(address _logxTokenAddress, string memory _name, string memory _symbol) external onlyGov {
-        require(!isInitialized, "LogxStaker: already initialized");
 
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _logxTokenAddress, string memory _name, string memory _symbol) external initializer {
+        __Ownable_init(msg.sender);
         logxTokenAddress = _logxTokenAddress;
         name = _name;
         symbol = _symbol;
-
-        isInitialized = true;
     }
 
-    function setHandler(address _handler, bool _isActive) external onlyGov {
+    function setHandler(address _handler, bool _isActive) external onlyOwner {
         isHandler[_handler] = _isActive;
     }
 
