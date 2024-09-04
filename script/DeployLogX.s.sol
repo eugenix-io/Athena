@@ -9,15 +9,16 @@ contract DeployLogX is Script {
         vm.startBroadcast(vm.envUint("PRIVATE_KEY_ADMIN"));
 
         // Set the initial supply as per your requirement, e.g., 100,000 LOGX tokens.
-        uint256 initialSupply = 5 * 1e18; // Using 1e18 to adhere to the 18 decimals in ERC-20
+        // uint256 initialSupply = 0; // Using 1e18 to adhere to the 18 decimals in ERC-20
 
-        // Deploy the contract
-        LogX logx = new LogX(initialSupply);
+        // // Deploy the contract
+        LogX logx = LogX(vm.envAddress("LOGX"));
 
-        console.log("LogX deployed at: ", address(logx));
+        // console.log("LogX deployed at: ", address(logx));
 
         // Optionally, you can set up additional configuration here, such as setting a government address or minters.
-        // logx.setGov(<address>);
+        logx.setGov(0xe4a6412f7Ed398405Ae9932c5B5Ee555c91b8a78);
+        console.log("gov changed");
         // logx.setMinter(<address>, true);
 
         vm.stopBroadcast();
