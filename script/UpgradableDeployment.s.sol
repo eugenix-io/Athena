@@ -16,11 +16,8 @@ contract UpgradableDeploymentScript is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_ADMIN"); 
         vm.startBroadcast(deployerPrivateKey);
-        LogxStaker logXStaker = LogxStaker(vm.envAddress("STAKER_CONTRACT"));
-        logXStaker.setHandler(endpoint, true);
+        deployLogXStaker(vm.envAddress("PROXY_ADMIN"));
         vm.stopBroadcast();
-
-
     }
 
     function deployLogXStaker(address proxyAdmin) internal {
@@ -29,13 +26,14 @@ contract UpgradableDeploymentScript is Script {
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(address(logXStaker),proxyAdmin,"");
         LogxStaker proxyContract = LogxStaker(payable(address(proxy)));
         console.log("logxStaker Proxy: ", address(proxyContract));
-        proxyContract.initialize(0xF7122517F24C9b3c6eFbB1080Df0cF44Ef7971BA, "Staked LogX", "stLogX");
+        proxyContract.initialize(vm.envAddress("LOGX"), "Staked LogX", "stLogX");
 
         //set CH as handler
         proxyContract.setHandler(clearingHouse, true); 
         proxyContract.setHandler(endpoint, true);
 
         console.log("Handler set: ", clearingHouse);
+        console.log("Handler set: ", endpoint);
     }
 
     function updateLogxStakerImplementation() internal {
