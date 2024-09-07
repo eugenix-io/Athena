@@ -12,32 +12,30 @@ import "openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeabl
 
 contract UpgradableDeploymentScript is Script {
     address clearingHouse = vm.envAddress("CLEARINGHOUSE");
+    address endpoint = vm.envAddress("ENDPOINT");
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_ADMIN"); 
         vm.startBroadcast(deployerPrivateKey);
-        // ProxyAdmin proxyAdmin = ProxyAdmin(0x5e576B171ba6AF1a7f6326f26C1dd133937Ab5C9);
-        // console.log("Proxy Admin: ", address(proxyAdmin));
-        // address stakerProxy = deployLogXStaker(address(proxyAdmin));
-        // console.log("Staker Proxy: ", stakerProxy);
-        deployLogXStaker(0xE5d5aC6988be36e5B4e5A4D539cFA9a1790C94f0);
+        LogxStaker logXStaker = LogxStaker(vm.envAddress("STAKER_CONTRACT"));
+        logXStaker.setHandler(endpoint, true);
         vm.stopBroadcast();
 
 
     }
 
-    function deployLogXStaker(address proxyAdmin) internal returns(address) {
+    function deployLogXStaker(address proxyAdmin) internal {
         LogxStaker logXStaker = new LogxStaker();
         console.log("logxStaker Implementation: ", address(logXStaker));
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(address(logXStaker),proxyAdmin,"");
         LogxStaker proxyContract = LogxStaker(payable(address(proxy)));
-        proxyContract.initialize(address(0), "Staked LogX", "stLogX");
-        return address(proxy);
+        console.log("logxStaker Proxy: ", address(proxyContract));
+        proxyContract.initialize(0xF7122517F24C9b3c6eFbB1080Df0cF44Ef7971BA, "Staked LogX", "stLogX");
 
         //set CH as handler
         proxyContract.setHandler(clearingHouse, true); 
+        proxyContract.setHandler(endpoint, true);
 
         console.log("Handler set: ", clearingHouse);
-        return address(proxy);
     }
 
     function updateLogxStakerImplementation() internal {
