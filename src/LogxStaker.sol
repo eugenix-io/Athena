@@ -88,7 +88,7 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
       */
     function stakeForAccount(bytes32 subAccountId, uint256 amount, address receiver) payable external nonReentrant returns (uint256) {
         _validateHandler();
-        require(amount > 0, "Reward Tracker: invalid amount");
+        require(amount != 0, "Reward Tracker: invalid amount");
 
 
         // Create a storage reference to the stake
@@ -172,7 +172,7 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
       */
     function unstakeForAccount(bytes32 subAccountId, uint256 amount, address receiver) external nonReentrant() returns(uint256) {
         _validateHandler();
-        require(amount > 0, "Reward Tracker: invalid amount");
+        require(amount != 0, "Reward Tracker: invalid amount");
 
         Stake storage stake = stakes[subAccountId];
 
