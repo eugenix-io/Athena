@@ -150,6 +150,11 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
     function _claimForAccount(bytes32 subAccountId, address _receiver) private returns(uint256) {
         Stake memory stake = stakes[subAccountId];
 
+        if (cumulativeEarningsRate < stake.cumulativeEarningsRate) {
+            emit Claim(_receiver, 0);
+            return 0;
+        }
+
         uint256 rewards = (stake.amount * (cumulativeEarningsRate - stake.cumulativeEarningsRate)) / PRECISION;
         emit Claim(_receiver, rewards);
         return rewards;
