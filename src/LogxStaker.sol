@@ -58,6 +58,7 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     function setHandler(address _handler, bool _isActive) external onlyOwner {
+        require(_handler != address(0), "LogxStaker: invalid handler address");
         isHandler[_handler] = _isActive;
     }
 
@@ -87,7 +88,7 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
       */
     function stakeForAccount(bytes32 subAccountId, uint256 amount, address receiver) payable external nonReentrant returns (uint256) {
         _validateHandler();
-        require(amount > 0, "Reward Tracker: invalid amount");
+        require(amount != 0, "Reward Tracker: invalid amount");
 
 
         // Create a storage reference to the stake
@@ -150,6 +151,11 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
     function _claimForAccount(bytes32 subAccountId, address _receiver) private returns(uint256) {
         Stake memory stake = stakes[subAccountId];
 
+        if (cumulativeEarningsRate < stake.cumulativeEarningsRate) {
+            emit Claim(_receiver, 0);
+            return 0;
+        }
+
         uint256 rewards = (stake.amount * (cumulativeEarningsRate - stake.cumulativeEarningsRate)) / PRECISION;
         emit Claim(_receiver, rewards);
         return rewards;
@@ -166,7 +172,7 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
       */
     function unstakeForAccount(bytes32 subAccountId, uint256 amount, address receiver) external nonReentrant() returns(uint256) {
         _validateHandler();
-        require(amount > 0, "Reward Tracker: invalid amount");
+        require(amount != 0, "Reward Tracker: invalid amount");
 
         Stake storage stake = stakes[subAccountId];
 
