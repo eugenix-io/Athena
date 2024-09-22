@@ -13,7 +13,7 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
     using SafeERC20 for IERC20;
 
     //Constants
-    uint256 public constant PRECISION = 1e12;
+    uint256 public constant PRECISION = 1e18;
     uint8 public constant decimals = 18;
 
     //Global Variables
@@ -27,6 +27,7 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
     mapping (address => bool) public isHandler;
     mapping (bytes32 => Stake) public stakes;
     mapping (address => uint256) public balances;
+    mapping (bytes32 => int256) public pendingRewards;
 
     //Events
     event Claim(address receiver, uint256 amount);
@@ -86,8 +87,9 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
      @param amount of LogX ERC20 tokens being staked (denominated in 10^18)
      @param receiver wallet address of the user 
       */
-    function stakeForAccount(bytes32 subAccountId, uint256 amount, address receiver) payable external nonReentrant returns (uint256) {
+    function stakeForAccount(bytes32 subAccountId, uint256 amount, address receiver,int transientRewards) payable external nonReentrant {
         _validateHandler();
+         validateTransientRewards(transientRewards);
         require(amount != 0, "Reward Tracker: invalid amount");
 
 
@@ -106,12 +108,13 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
             stake.amount += amount;
             stake.cumulativeEarningsRate = cumulativeEarningsRate;
         }
+
+        pendingRewards[subAccountId] += int(claimedRewards) +transientRewards;
         balances[receiver] = balances[receiver] + amount;
         totalSupply = totalSupply + amount;
 
         emit Transfer(address(0), receiver, amount);
 
-        return claimedRewards;
     }
 
 
@@ -123,20 +126,19 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
      @param subAccountId of the user
      @param receiver wallet address of the user 
       */
-    function claimForAccount(bytes32 subAccountId, address receiver) external nonReentrant returns(uint256){
+    function claimForAccount(bytes32 subAccountId, address receiver, int transientRewards) external nonReentrant returns(int){
         _validateHandler();
-
+        validateTransientRewards(transientRewards);
         Stake storage stake = stakes[subAccountId];
 
-        if (stake.amount == 0){
-            return 0;
-        }
         uint256 claimedRewards = _claimForAccount(subAccountId, receiver);
 
         //Update cumulative earnings rate
         stake.cumulativeEarningsRate = cumulativeEarningsRate;
+        int rewardsInt = int(claimedRewards) + pendingRewards[subAccountId]+transientRewards;
+        pendingRewards[subAccountId] = 0;
 
-        return claimedRewards;
+        return rewardsInt;
     }
 
     /**
@@ -170,15 +172,16 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
      @param amount of LogX ERC20 tokens being staked (denominated in 10^18)
      @param receiver wallet address of the user 
       */
-    function unstakeForAccount(bytes32 subAccountId, uint256 amount, address receiver) external nonReentrant() returns(uint256) {
+    function unstakeForAccount(bytes32 subAccountId, uint256 amount, address receiver, int transientRewards) external nonReentrant() {
         _validateHandler();
+        validateTransientRewards(transientRewards);
         require(amount != 0, "Reward Tracker: invalid amount");
 
         Stake storage stake = stakes[subAccountId];
 
         // User does not currently have a stake.
         if (stake.amount == 0) {
-            return 0;
+            return;
         } 
         require(stake.amount >= amount, "Invalid unstake amount");
         uint256 claimedRewards = _claimForAccount(subAccountId, receiver);
@@ -187,10 +190,18 @@ contract LogxStaker is ILogxStaker, IERC20, ReentrancyGuard, Ownable2StepUpgrade
 
         balances[receiver] = balances[receiver] - amount;
         totalSupply = totalSupply - amount;
+        pendingRewards[subAccountId] += int(claimedRewards)+transientRewards;
 
         emit Transfer(receiver, address(0), amount);
 
-        return claimedRewards;
+    }
+
+    function validateTransientRewards(int transientRewards) public {
+        int transientRewardsAbs = transientRewards;
+        if(transientRewards < 0 ){
+            transientRewardsAbs = -1*transientRewards;
+        }
+        require(transientRewards < 10**19);
     }
 
     /**
