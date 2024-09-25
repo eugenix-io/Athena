@@ -9,9 +9,9 @@ interface ILogxStaker {
     function setCumulativeEarningsRate(uint256 _rate) external;
 
     // Feature functions
-    function stakeForAccount(bytes32 subAccountId, uint256 amount, address receiver) external payable returns (uint256);
-    function claimForAccount(bytes32 subAccountId, address receiver) external returns (uint256);
-    function unstakeForAccount(bytes32 subAccountId, uint256 amount, address receiver) external returns (uint256);
+    function stakeForAccount(bytes32 subAccountId, uint256 amount, address receiver, int transientRewards) external payable;
+    function claimForAccount(bytes32 subAccountId, address receiver, int transientRewards) external returns (int);
+    function unstakeForAccount(bytes32 subAccountId, uint256 amount, address receiver, int transientRewards) external;
 
     // Mappings
     function isHandler(address handler) external view returns (bool);
